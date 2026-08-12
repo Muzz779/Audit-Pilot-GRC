@@ -11,7 +11,9 @@ The regulation data has been reviewed by a qualified person before any paying cu
 
 ---
 
-## PHASE 4 — Compliance Score from Accepted Findings
+## PHASE 4 — Compliance Score from Accepted Findings  ✅ DONE (validated on real data)
+Implemented: `gap→not_started`; shared `recalcFrameworkScore` helper in `src/lib/compliance/score.ts` (reused by the manual control-status route); accept-hook in `src/app/api/findings/route.ts`; "from audit" tag on the Compliance page. Recompute-from-scratch keeps re-accepts idempotent.
+
 **Goal:** Close the loop so accepted findings drive the dashboard compliance %, instead of it being based only on manually-set control statuses.
 
 **Why it matters:** Right now findings and the compliance score are disconnected. A customer who runs an audit and accepts findings expects their score to reflect that. This is the payoff of the findings engine.

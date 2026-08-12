@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Sparkles, CheckCircle2, XCircle, AlertTriangle, AlertOctagon,
   Circle, Loader2, FileSearch, ChevronDown, ChevronUp, ShieldAlert,
-  Clock, Check, X, FileText,
+  Clock, Check, X, FileText, FileOutput,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -117,6 +117,11 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
 
   const draftCount = findings.filter(f => f.status === 'draft_pending_review').length;
 
+  // Accepted findings for the selected framework — drives the Board Report button
+  const acceptedCount = findings.filter(
+    f => f.status === 'accepted' && (!selectedFramework || f.framework_id === selectedFramework)
+  ).length;
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
 
@@ -151,15 +156,36 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
           )}
         </div>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All findings</SelectItem>
-            <SelectItem value="draft_pending_review">Pending review</SelectItem>
-            <SelectItem value="accepted">Accepted</SelectItem>
-            <SelectItem value="dismissed">Dismissed</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          {selectedFramework && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs"
+              onClick={() => window.open(`/reports/${selectedFramework}`, '_blank')}
+              title={acceptedCount === 0
+                ? 'No accepted findings yet — the report will be empty until you accept some'
+                : `Generate a board report from ${acceptedCount} accepted finding(s)`}
+            >
+              <FileOutput className="w-3.5 h-3.5" /> Board Report
+              {acceptedCount > 0 && (
+                <span className="ml-1 rounded-full bg-emerald-100 text-emerald-700 px-1.5 text-[10px]">
+                  {acceptedCount}
+                </span>
+              )}
+            </Button>
+          )}
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All findings</SelectItem>
+              <SelectItem value="draft_pending_review">Pending review</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="dismissed">Dismissed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Run Full Audit — batch */}

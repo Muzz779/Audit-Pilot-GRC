@@ -18,7 +18,7 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - unpdf (PDF.js engine) for PDF text extraction — REPLACED pdf-parse, which failed on valid PDFs with "bad xref entry". Do not reintroduce pdf-parse.
 - PayFast (ZAR) for billing, sandbox mode currently
 - Vercel for deployment
-- Repo: github.com/Muzz779/auditPilot (branch: main)
+- Repo: github.com/Muzz779/Audit-Pilot-GRC (branch: main)
 
 ## Hard-won gotchas (these cost real debugging time — respect them)
 - **Vercel strict TypeScript**: every API route needs `const body: any = await req.json()`. Every `.map/.filter/.reduce` callback needs explicit param types (e.g. `(c: any)`). Dynamic route params are `Promise<{id:string}>` and must be awaited (Next 15).
@@ -33,7 +33,8 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - **Core app**: auth, multi-tenant orgs with RLS, Risk Register, Policy Management, Compliance frameworks (controls auto-seed), Audit & Evidence, AI Tools (chat/policy/risk/regscan), Team, PayFast billing, Admin panel.
 - **Phase 1 — RAG document intelligence**: upload evidence → Analyze (extract via unpdf → chunk → embed via Voyage → store in pgvector) → Ask AuditPilot (retrieves from documents + regulation base, answers with citations, honest "insufficient evidence" behavior). VALIDATED: page-accurate citations, correct POPIA retrieval, honest refusals.
 - **Phase 2 — Findings Engine**: per-control analysis. For a control, finds governing regulation + relevant evidence via vector search, Claude classifies as Satisfied/Partial/Gap with High/Med/Low confidence + severity, cited to evidence chunks. Findings land as `draft_pending_review`, human accepts/dismisses, full history logged. VALIDATED: correctly returned Satisfied for a control with encryption evidence, Partial for one with conflicting evidence, Gap when evidence absent — i.e. it genuinely discriminates.
-- **Phase 3 (this batch) — Run Full Audit**: sequential batch across all controls in a framework, one control per HTTP request (no timeout), partial-save (resumable), skips controls that already have findings, live progress + Stop. Built; being tested now.
+- **Phase 3 — Run Full Audit**: sequential batch across all controls in a framework, one control per HTTP request (no timeout), partial-save (resumable), skips controls that already have findings, live progress + Stop. VALIDATED.
+- **Phase 4 — Compliance score from accepted findings**: accepting a finding maps its determination to the linked control's status (satisfied→implemented, partial→in_progress, gap→not_started) and recalculates the framework score via the shared `recalcFrameworkScore` helper (`src/lib/compliance/score.ts`, reused by the manual control-status route). Recompute-from-scratch = idempotent (re-accepting can't double-count). Dismiss/not_assessed change nothing. Compliance page shows a "from audit" tag on controls whose status came from an accepted finding. VALIDATED on real data.
 
 ## Database migrations (run in order in Supabase SQL editor)
 1. `supabase/schema.sql` — core app
@@ -42,6 +43,8 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 4. `supabase/migration_002_findings.sql` — control_regulation_map, findings, finding_history
 5. `supabase/migration_003_audit_runs.sql` — audit_runs (batch tracking)
 Then run `npm run embed-regulations` once to populate regulation embeddings.
+
+> NOTE: migrations 002 and 003 have been applied directly in the live Supabase project, but the `.sql` files are NOT yet committed to this repo — so a fresh environment cannot be rebuilt from source alone. Reconstructing and committing them from the live schema is outstanding tech-debt (findings table columns are currently inferable only from code: `findings` has `control_id`→controls.id, `framework_id`, `determination`, `status`, `reviewed_by/at`, `review_note`).
 
 ## Key file locations
 - RAG lib: `src/lib/rag/{embeddings,extraction,chunking}.ts`
@@ -52,9 +55,7 @@ Then run `npm run embed-regulations` once to populate regulation embeddings.
 - Analyze: `src/app/api/evidence/analyze/route.ts`
 
 ## Roadmap — what's LEFT (in priority order)
-- **Finish validating Phase 3 batch** (skip logic, partial-save on Stop, resume).
-- **Compliance score from accepted findings** — feed accepted findings back into the dashboard compliance %.
-- **Board report / PDF export** — turn accepted findings into a formatted executive report.
+- **Phase 5 — Board report / PDF export** — turn accepted findings into a formatted executive report (NEXT). Note: an older general HTML report exists at `src/app/api/audit-report/route.ts` (frameworks/risks/policies), but it is NOT findings-based and lacks evidence citations, severity grouping, and the unverified-regulation/DRAFT disclaimers.
 - **Scanned-PDF OCR** — currently scanned PDFs are rejected; add OCR via Claude vision.
 - **More file types in analysis** — XLSX ingestion.
 - **More frameworks** (ISO 27001, GDPR, etc.) — GATED on legal review of the regulation-base approach; adding unverified frameworks multiplies liability. Do not do this without the human confirming legal review.
