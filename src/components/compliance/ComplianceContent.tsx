@@ -12,6 +12,7 @@ interface ComplianceContentProps {
   orgFrameworks: any[];
   allFrameworks: any[];
   controls: any[];
+  auditControlIds?: string[];
   orgId: string;
   userId: string;
   userRole: string;
@@ -28,10 +29,13 @@ export function ComplianceContent({
   orgFrameworks: initialOrgFW,
   allFrameworks,
   controls: initialControls,
+  auditControlIds = [],
   orgId,
   userId,
   userRole,
 }: ComplianceContentProps) {
+  // Controls whose current status was set by an accepted finding (Phase 4).
+  const auditControlIdSet = new Set(auditControlIds);
   const [orgFrameworks, setOrgFrameworks] = useState(initialOrgFW);
   const [controls, setControls] = useState(initialControls);
   const [selectedFrameworkId, setSelectedFrameworkId] = useState<string | null>(
@@ -331,6 +335,14 @@ export function ComplianceContent({
                               <span className="text-sm font-medium text-foreground truncate">
                                 {control.name}
                               </span>
+                              {auditControlIdSet.has(control.id) && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium shrink-0"
+                                  title="This control's status came from an accepted audit finding"
+                                >
+                                  from audit
+                                </span>
+                              )}
                             </div>
                             {control.description && (
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">

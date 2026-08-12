@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { recalcFrameworkScore } from '@/lib/compliance/score';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,27 +32,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Recalculate compliance score for this framework
+  // Recalculate compliance score for this framework (shared helper — see src/lib/compliance/score.ts)
   if (status && data.framework_id) {
-    const { data: allControls } = await supabase
-      .from('controls')
-      .select('status')
-      .eq('organisation_id', profile.organisation_id)
-      .eq('framework_id', data.framework_id);
-
-    if (allControls) {
-      const applicable = allControls.filter(c => c.status !== 'not_applicable');
-      const implemented = applicable.filter(c => c.status === 'implemented').length;
-      const score = applicable.length > 0
-        ? Math.round((implemented / applicable.length) * 100)
-        : 0;
-
-      await supabase
-        .from('organisation_frameworks')
-        .update({ compliance_score: score })
-        .eq('organisation_id', profile.organisation_id)
-        .eq('framework_id', data.framework_id);
-    }
+    await recalcFrameworkScore(supabase, profile.organisation_id, data.framework_id);
   }
 
   await supabase.from('audit_logs').insert({

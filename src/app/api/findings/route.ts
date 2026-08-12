@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { recalcFrameworkScore } from '@/lib/compliance/score';
+
+// Phase 4: an ACCEPTED finding's determination maps to a control status.
+// Anything not in this map (e.g. 'not_assessed') leaves the control untouched.
+// Note: control_status enum has no 'gap' — gaps map to 'not_started', and the
+// Compliance page shows a "from audit" tag so this isn't confused with a control
+// that was simply never started.
+const DETERMINATION_TO_CONTROL_STATUS: Record<string, string> = {
+  satisfied: 'implemented',
+  partial: 'in_progress',
+  gap: 'not_started',
+};
 
 // GET — list findings for the org, optionally filtered
 export async function GET(req: NextRequest) {
@@ -49,10 +61,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'finding_id and a valid action (accept/dismiss) are required' }, { status: 400 });
   }
 
-  // Fetch current finding to record previous status
+  // Fetch current finding — need previous status for history, plus the control link
+  // and determination so an accept can drive the control status (Phase 4).
   const { data: current } = await supabase
     .from('findings')
-    .select('status')
+    .select('status, control_id, framework_id, determination')
     .eq('id', finding_id)
     .eq('organisation_id', profile.organisation_id)
     .single();
@@ -76,6 +89,34 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // ── Phase 4: closing the loop ────────────────────────────────────────────────
+  // Only an ACCEPT drives control state; dismiss never does. The determination maps
+  // to a control status, and the framework score is recomputed from scratch (idempotent —
+  // re-accepting the same finding cannot double-count). If two accepted findings target
+  // the same control, the most recently accepted one wins. A control-update failure must
+  // not corrupt the score, so we only recalc when the control update actually succeeded.
+  let controlStatusApplied: string | null = null;
+  if (action === 'accept' && current.control_id) {
+    const mappedStatus = DETERMINATION_TO_CONTROL_STATUS[current.determination];
+    if (mappedStatus) {
+      const controlUpdate: Record<string, unknown> = { status: mappedStatus };
+      if (mappedStatus === 'implemented') controlUpdate.last_reviewed_at = new Date().toISOString();
+
+      const { error: controlError } = await supabase
+        .from('controls')
+        .update(controlUpdate)
+        .eq('id', current.control_id)
+        .eq('organisation_id', profile.organisation_id);
+
+      if (!controlError) {
+        controlStatusApplied = mappedStatus;
+        if (current.framework_id) {
+          await recalcFrameworkScore(supabase, profile.organisation_id, current.framework_id);
+        }
+      }
+    }
+  }
+
   // Log to history
   await supabase.from('finding_history').insert({
     finding_id,
@@ -95,5 +136,5 @@ export async function PATCH(req: NextRequest) {
     resource_id: finding_id,
   });
 
-  return NextResponse.json({ data });
+  return NextResponse.json({ data, control_status_applied: controlStatusApplied });
 }

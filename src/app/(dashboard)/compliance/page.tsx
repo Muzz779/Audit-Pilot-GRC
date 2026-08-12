@@ -18,6 +18,7 @@ export default async function CompliancePage() {
     { data: orgFrameworks },
     { data: allFrameworks },
     { data: controls },
+    { data: acceptedFindings },
   ] = await Promise.all([
     supabase
       .from('organisation_frameworks')
@@ -30,7 +31,17 @@ export default async function CompliancePage() {
       .select('*, assignee:profiles!controls_assigned_to_fkey(id, full_name, email)')
       .eq('organisation_id', orgId)
       .order('created_at', { ascending: false }),
+    // Phase 4: controls whose status came from an accepted finding, for the "from audit" tag
+    supabase
+      .from('findings')
+      .select('control_id')
+      .eq('organisation_id', orgId)
+      .eq('status', 'accepted'),
   ]);
+
+  const auditControlIds = Array.from(
+    new Set((acceptedFindings || []).map((f: any) => f.control_id).filter(Boolean))
+  );
 
   return (
     <div className="flex flex-col">
@@ -39,6 +50,7 @@ export default async function CompliancePage() {
         orgFrameworks={orgFrameworks || []}
         allFrameworks={allFrameworks || []}
         controls={controls || []}
+        auditControlIds={auditControlIds}
         orgId={orgId}
         userId={user.id}
         userRole={profile?.role}

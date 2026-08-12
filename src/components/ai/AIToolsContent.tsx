@@ -655,7 +655,7 @@ function RegulatoryPanel({ orgId }: { orgId: string }) {
           <p className="text-sm font-semibold text-foreground">
             {result.alerts.length} Alert{result.alerts.length !== 1 ? 's' : ''} Found
           </p>
-          {result.alerts.map((alert: any, any, i: number) => (
+          {result.alerts.map((alert: any, i: number) => (
             <div
               key={i}
               className={cn('rounded-xl border p-4', severityStyles[alert.severity] || 'bg-muted border-border')}
