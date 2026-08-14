@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { checkAiQuota, quotaExceededResponse } from '@/lib/usage/quota';
 import { assessRisk } from '@/lib/anthropic';
 
 export async function POST(req: NextRequest) {
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!profile?.organisation_id) return NextResponse.json({ error: 'No organisation' }, { status: 400 });
+
+  const quota = await checkAiQuota(profile.organisation_id);
+  if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
   const { title, description, category } = body;

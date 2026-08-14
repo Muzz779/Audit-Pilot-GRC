@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { analyzeControl } from '@/lib/findings/engine';
+import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
 export const maxDuration = 60; // one control comfortably fits in 60s
 
@@ -81,6 +82,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ done: false, run: updated, last_control: 'skipped (not found)' });
   }
 
+  // Cost guard — pause the batch (resumable) if the org has hit its monthly AI cap.
+  // Pending controls are left intact so the run can continue after an upgrade or next month.
+  const quota = await checkAiQuota(profile.organisation_id);
+  if (!quota.allowed) {
+    return NextResponse.json({
+      done: true,
+      quota_exceeded: true,
+      run,
+      message: quotaExceededResponse(quota).error,
+    });
+  }
+
   try {
     // Run the validated per-control engine
     const result = await analyzeControl(supabase, profile.organisation_id, {
@@ -117,6 +130,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (findingError) throw new Error(findingError.message);
+
+    // Meter this AI operation against the org's monthly usage
+    await logAiUsage(profile.organisation_id, user.id, 'finding_analysis');
 
     await supabase.from('finding_history').insert({
       finding_id: finding.id,

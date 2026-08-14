@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { analyzeControl } from '@/lib/findings/engine';
+import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
 export const maxDuration = 60;
 
@@ -21,6 +22,10 @@ export async function POST(req: NextRequest) {
   if (!['owner', 'admin', 'member'].includes(profile.role)) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
+
+  // Cost guard — block if the org has hit its monthly AI operation cap
+  const quota = await checkAiQuota(profile.organisation_id);
+  if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
   const { control_id } = body;
@@ -97,6 +102,9 @@ export async function POST(req: NextRequest) {
       resource_id: finding.id,
       resource_name: result.title,
     });
+
+    // Meter this AI operation against the org's monthly usage
+    await logAiUsage(profile.organisation_id, user.id, 'finding_analysis');
 
     return NextResponse.json({ data: finding });
 

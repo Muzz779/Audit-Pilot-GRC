@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { embedQuery } from '@/lib/rag/embeddings';
+import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -45,6 +46,9 @@ export async function POST(req: NextRequest) {
   if (!profile?.organisation_id) {
     return NextResponse.json({ error: 'No organisation' }, { status: 400 });
   }
+
+  const quota = await checkAiQuota(profile.organisation_id);
+  if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
   const { question, framework_id } = body;
@@ -169,6 +173,9 @@ ${regulationContext || '(none retrieved)'}`;
       true,
       null
     );
+
+    // Meter this AI operation against the org's monthly usage
+    await logAiUsage(profile.organisation_id, user.id, 'ask');
 
     // ── Step 8: Return answer + structured citations for UI rendering ──
     return NextResponse.json({

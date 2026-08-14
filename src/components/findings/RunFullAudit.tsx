@@ -69,6 +69,7 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
 
       // 2. Step through the queue, one control per request
       let done = false;
+      let quotaMessage = '';
       while (!done && !cancelRef.current) {
         const stepRes = await fetch('/api/audit-runs/step', {
           method: 'POST',
@@ -83,6 +84,7 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
         }
 
         done = stepData.done;
+        if (stepData.quota_exceeded) quotaMessage = stepData.message || 'Monthly AI limit reached.';
 
         if (stepData.run) {
           const r = stepData.run;
@@ -107,6 +109,8 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
           body: JSON.stringify({ run_id: current.runId, cancel: true }),
         }).catch(() => {});
         toast('Audit stopped. Findings generated so far have been saved.', { icon: '⏸️' });
+      } else if (quotaMessage) {
+        toast(quotaMessage, { icon: '🚫' });
       } else if (done) {
         toast.success('Full audit complete — review the draft findings below');
       }
