@@ -91,14 +91,14 @@ export async function POST(req: NextRequest) {
     // rather than fetching the public URL, which won't work for private buckets.
     const serviceClient = await createServiceRoleClient();
 
-    // Extract the storage path from the file_url
-    // URL format: https://xxx.supabase.co/storage/v1/object/public/evidence/orgId/timestamp-filename
-    // We need just: orgId/timestamp-filename
-    const urlParts = evidence.file_url.split('/evidence/');
-    if (urlParts.length < 2) {
-      throw new Error('Could not parse storage path from file URL. Please re-upload the file.');
+    // file_url now stores the storage path directly (orgId/timestamp-filename).
+    // Older rows stored a public URL that embeds the path after "/evidence/" — handle both.
+    const storagePath = evidence.file_url.includes('/evidence/')
+      ? evidence.file_url.split('/evidence/')[1]
+      : evidence.file_url;
+    if (!storagePath) {
+      throw new Error('Could not resolve storage path from evidence record. Please re-upload the file.');
     }
-    const storagePath = urlParts[1];
 
     const { data: fileData, error: downloadError } = await serviceClient.storage
       .from('evidence')

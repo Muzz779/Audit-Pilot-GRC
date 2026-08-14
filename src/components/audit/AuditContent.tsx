@@ -126,8 +126,9 @@ export function AuditContent({
             toast('Storage bucket not found — saving metadata only. Re-run schema.sql in Supabase to fix.', { icon: '⚠️' });
           }
         } else {
-          const { data: urlData } = supabase.storage.from('evidence').getPublicUrl(storageData.path);
-          fileUrl = urlData.publicUrl;
+          // Store the storage PATH, never a public URL — the `evidence` bucket is private.
+          // Downloads are served through short-lived signed URLs via /api/evidence/[id]/download.
+          fileUrl = storageData.path;
         }
       }
 
@@ -390,7 +391,7 @@ export function AuditContent({
                         </div>
                         {ev.file_url && (
                           <a
-                            href={ev.file_url}
+                            href={`/api/evidence/${ev.id}/download`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 flex items-center gap-1 text-[11px] text-brand-600 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
