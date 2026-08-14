@@ -84,6 +84,24 @@ export default async function DashboardPage() {
     ? Math.round(frameworks.reduce((sum: number, f: any) => sum + (f.compliance_score || 0), 0) / frameworks.length)
     : 0;
 
+  // First-run onboarding progress — derived from real data
+  const [
+    { count: evidenceCount },
+    { count: analyzedCount },
+    { count: findingsCount },
+  ] = await Promise.all([
+    supabase.from('evidence').select('id', { count: 'exact', head: true }).eq('organisation_id', orgId),
+    supabase.from('document_analysis').select('id', { count: 'exact', head: true }).eq('organisation_id', orgId),
+    supabase.from('findings').select('id', { count: 'exact', head: true }).eq('organisation_id', orgId),
+  ]);
+
+  const onboarding = {
+    hasFramework: (frameworks?.length || 0) > 0,
+    hasEvidence:  (evidenceCount || 0) > 0,
+    hasAnalyzed:  (analyzedCount || 0) > 0,
+    hasFindings:  (findingsCount || 0) > 0,
+  };
+
   // Real control-status breakdown for the dashboard overview (no fabricated history)
   const controlStats = {
     implemented:    controls?.filter(c => c.status === 'implemented').length    || 0,
@@ -109,6 +127,7 @@ export default async function DashboardPage() {
           upcoming_audits: audits?.length || 0,
         }}
         controlStats={controlStats}
+        onboarding={onboarding}
         risks={risks || []}
         policies={policies || []}
         frameworks={frameworks || []}

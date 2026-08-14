@@ -34,6 +34,12 @@ interface DashboardContentProps {
     not_started: number;
     not_applicable: number;
   };
+  onboarding: {
+    hasFramework: boolean;
+    hasEvidence: boolean;
+    hasAnalyzed: boolean;
+    hasFindings: boolean;
+  };
   risks: any[];
   policies: any[];
   frameworks: any[];
@@ -50,8 +56,17 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export function DashboardContent({
-  stats, controlStats, risks, policies, frameworks, recentActivity, subscription, orgName,
+  stats, controlStats, onboarding, risks, policies, frameworks, recentActivity, subscription, orgName,
 }: DashboardContentProps) {
+  // First-run checklist — shown until the org has completed the core setup flow
+  const onboardingSteps = [
+    { done: onboarding.hasFramework, label: 'Add a compliance framework',   hint: 'Start with POPIA',            href: '/compliance', cta: 'Add framework' },
+    { done: onboarding.hasEvidence,  label: 'Upload a compliance document', hint: 'Your policy, contract, etc.',  href: '/audit',      cta: 'Upload evidence' },
+    { done: onboarding.hasAnalyzed,  label: 'Analyze the document',         hint: 'Extracts & indexes evidence', href: '/audit',      cta: 'Analyze' },
+    { done: onboarding.hasFindings,  label: 'Run an audit',                 hint: 'Generate cited findings',     href: '/findings',   cta: 'Run audit' },
+  ];
+  const onboardingComplete = onboardingSteps.every(s => s.done);
+  const onboardingDoneCount = onboardingSteps.filter(s => s.done).length;
   const topRisks = [...risks]
     .filter(r => r.status !== 'resolved' && r.status !== 'accepted')
     .sort((a, b) => b.risk_score - a.risk_score)
@@ -79,6 +94,51 @@ export function DashboardContent({
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+
+      {/* First-run onboarding checklist — disappears once setup is complete */}
+      {!onboardingComplete && (
+        <Card className="border-brand-200 dark:border-brand-800">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-semibold">Get started with AuditPilot</CardTitle>
+                <CardDescription className="text-xs">
+                  {onboardingDoneCount} of {onboardingSteps.length} steps complete — finish setup to run your first audit
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="text-xs">{onboardingDoneCount}/{onboardingSteps.length}</Badge>
+            </div>
+            <Progress
+              value={(onboardingDoneCount / onboardingSteps.length) * 100}
+              indicatorColor="bg-brand-500"
+              className="h-1.5 mt-2"
+            />
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {onboardingSteps.map((step, i) => (
+              <div key={step.label} className="flex items-center gap-3 p-2 rounded-lg">
+                <div className={cn(
+                  'w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold',
+                  step.done ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-muted text-muted-foreground'
+                )}>
+                  {step.done ? <CheckSquare className="w-3.5 h-3.5" /> : i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-sm font-medium', step.done ? 'text-muted-foreground line-through' : 'text-foreground')}>
+                    {step.label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{step.hint}</p>
+                </div>
+                {!step.done && (
+                  <Link href={step.href}>
+                    <Button variant="outline" size="sm" className="text-xs h-7 shrink-0">{step.cta} →</Button>
+                  </Link>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Upgrade banner */}
       {!isPro && (
