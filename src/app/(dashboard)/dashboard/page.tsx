@@ -84,6 +84,14 @@ export default async function DashboardPage() {
     ? Math.round(frameworks.reduce((sum: number, f: any) => sum + (f.compliance_score || 0), 0) / frameworks.length)
     : 0;
 
+  // Real control-status breakdown for the dashboard overview (no fabricated history)
+  const controlStats = {
+    implemented:    controls?.filter(c => c.status === 'implemented').length    || 0,
+    in_progress:    controls?.filter(c => c.status === 'in_progress').length    || 0,
+    not_started:    controls?.filter(c => c.status === 'not_started').length    || 0,
+    not_applicable: controls?.filter(c => c.status === 'not_applicable').length || 0,
+  };
+
   return (
     <div className="flex flex-col">
       <Topbar
@@ -100,6 +108,7 @@ export default async function DashboardPage() {
           active_policies: approvedPolicies,
           upcoming_audits: audits?.length || 0,
         }}
+        controlStats={controlStats}
         risks={risks || []}
         policies={policies || []}
         frameworks={frameworks || []}

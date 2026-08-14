@@ -7,7 +7,6 @@ import {
   TrendingUp, TrendingDown, ArrowRight, Zap, Shield,
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,22 +28,18 @@ interface DashboardContentProps {
     active_policies: number;
     upcoming_audits: number;
   };
+  controlStats: {
+    implemented: number;
+    in_progress: number;
+    not_started: number;
+    not_applicable: number;
+  };
   risks: any[];
   policies: any[];
   frameworks: any[];
   recentActivity: any[];
   subscription: Subscription | null;
   orgName: string;
-}
-
-// Build 6-month trend from real compliance score
-function buildTrendData(currentScore: number) {
-  const months = ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'];
-  const base = Math.max(currentScore - 30, 0);
-  return months.map((month, i) => ({
-    month,
-    compliance: Math.round(base + (currentScore - base) * (i / (months.length - 1))),
-  }));
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -55,14 +50,22 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export function DashboardContent({
-  stats, risks, policies, frameworks, recentActivity, subscription, orgName,
+  stats, controlStats, risks, policies, frameworks, recentActivity, subscription, orgName,
 }: DashboardContentProps) {
   const topRisks = [...risks]
     .filter(r => r.status !== 'resolved' && r.status !== 'accepted')
     .sort((a, b) => b.risk_score - a.risk_score)
     .slice(0, 5);
 
-  const trendData = buildTrendData(stats.compliance_percentage);
+  // Real control-status breakdown — the compliance overview bar (no fabricated trend)
+  const controlSegments = [
+    { key: 'implemented',    label: 'Implemented', value: controlStats.implemented,    cls: 'bg-emerald-500', dot: 'bg-emerald-500' },
+    { key: 'in_progress',    label: 'In progress', value: controlStats.in_progress,    cls: 'bg-amber-500',   dot: 'bg-amber-500'   },
+    { key: 'not_started',    label: 'Not started', value: controlStats.not_started,    cls: 'bg-gray-400',    dot: 'bg-gray-400'    },
+    { key: 'not_applicable', label: 'N/A',         value: controlStats.not_applicable, cls: 'bg-gray-200 dark:bg-gray-700', dot: 'bg-gray-300 dark:bg-gray-600' },
+  ];
+  const totalControls = controlSegments.reduce((s, seg) => s + seg.value, 0);
+  const applicableTotal = totalControls - controlStats.not_applicable;
 
   // Real risk distribution from actual data
   const riskDist = [
@@ -172,43 +175,60 @@ export function DashboardContent({
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Compliance trend */}
+        {/* Compliance overview — real control-status breakdown (no fabricated history) */}
         <Card className="lg:col-span-2 card-hover">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-semibold">Compliance Trend</CardTitle>
-                <CardDescription className="text-xs">6-month progress across all frameworks</CardDescription>
+                <CardTitle className="text-sm font-semibold">Compliance Overview</CardTitle>
+                <CardDescription className="text-xs">Control implementation across all frameworks</CardDescription>
               </div>
               <Badge variant="success" className="text-xs">
-                {stats.compliance_percentage}% current
+                {stats.compliance_percentage}% implemented
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={trendData} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
-                <defs>
-                  <linearGradient id="compGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#0284c7" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#0284c7" stopOpacity={0}   />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                  formatter={(v: number) => [`${v}%`, 'Compliance']}
-                />
-                <Area type="monotone" dataKey="compliance" stroke="#0284c7" fill="url(#compGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {totalControls === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                <CheckSquare className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-xs">No controls yet — add a framework to start tracking compliance</p>
+                <Link href="/compliance">
+                  <Button variant="ghost" size="sm" className="mt-2 text-xs">Add framework →</Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col justify-center space-y-5 py-2">
+                {/* Stacked proportion bar — real counts */}
+                <div className="flex h-5 w-full overflow-hidden rounded-full bg-muted">
+                  {controlSegments.map(seg => seg.value > 0 && (
+                    <div
+                      key={seg.key}
+                      className={seg.cls}
+                      style={{ width: `${(seg.value / totalControls) * 100}%` }}
+                      title={`${seg.label}: ${seg.value}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Legend with counts */}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {controlSegments.map(seg => (
+                    <div key={seg.key} className="flex items-center gap-1.5">
+                      <span className={cn('w-2 h-2 rounded-full shrink-0', seg.dot)} />
+                      <span className="text-xs text-muted-foreground">
+                        {seg.label}: <strong className="text-foreground">{seg.value}</strong>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  {controlStats.implemented} of {applicableTotal} applicable control{applicableTotal === 1 ? '' : 's'} implemented
+                  {' '}across {frameworks.length} framework{frameworks.length === 1 ? '' : 's'}.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
