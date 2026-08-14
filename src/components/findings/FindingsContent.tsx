@@ -50,6 +50,7 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
   const [analyzingControlId, setAnalyzingControlId] = useState<string | null>(null);
   const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [reviewing, setReviewing] = useState<{ id: string; action: 'accept' | 'dismiss' } | null>(null);
 
   const canReview = ['owner', 'admin', 'member'].includes(userRole);
 
@@ -97,6 +98,8 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
   };
 
   const handleReview = async (findingId: string, action: 'accept' | 'dismiss') => {
+    if (reviewing) return; // guard against double-submit / concurrent review
+    setReviewing({ id: findingId, action });
     try {
       const res = await fetch('/api/findings', {
         method: 'PATCH',
@@ -112,6 +115,8 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
       toast.success(action === 'accept' ? 'Finding accepted' : 'Finding dismissed');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setReviewing(null);
     }
   };
 
@@ -367,6 +372,8 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
                             size="sm"
                             className="h-7 text-[11px] px-3 bg-emerald-600 hover:bg-emerald-700"
                             onClick={() => handleReview(finding.id, 'accept')}
+                            loading={reviewing?.id === finding.id && reviewing?.action === 'accept'}
+                            disabled={!!reviewing}
                           >
                             <Check className="w-3 h-3" /> Accept Finding
                           </Button>
@@ -375,6 +382,8 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
                             size="sm"
                             className="h-7 text-[11px] px-3"
                             onClick={() => handleReview(finding.id, 'dismiss')}
+                            loading={reviewing?.id === finding.id && reviewing?.action === 'dismiss'}
+                            disabled={!!reviewing}
                           >
                             <X className="w-3 h-3" /> Dismiss
                           </Button>
