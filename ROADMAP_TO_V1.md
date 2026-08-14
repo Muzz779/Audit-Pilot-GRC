@@ -38,7 +38,9 @@ Implemented: `gap→not_started`; shared `recalcFrameworkScore` helper in `src/l
 
 ---
 
-## PHASE 5 — Board-Ready Report Export (PDF)
+## PHASE 5 — Board-Ready Report Export (PDF)  ✅ DONE (validated)
+Implemented as printable HTML route `src/app/reports/[frameworkId]/page.tsx` (browser print-to-PDF, no new deps). Accepted findings only, grouped by severity, document+page citations, DRAFT + always-on unverified-regulation disclaimers; "Board Report" button on the Findings page.
+
 **Goal:** Turn accepted findings + compliance state into a formatted executive report a customer can present to their board or an auditor.
 
 **Why it matters:** This is the tangible deliverable that justifies the subscription. It's what a customer shows their boss to prove value.
@@ -63,7 +65,9 @@ Implemented: `gap→not_started`; shared `recalcFrameworkScore` helper in `src/l
 
 ---
 
-## PHASE 6 — Pre-Launch Hardening
+## PHASE 6 — Pre-Launch Hardening  ✅ MOSTLY DONE
+Done: security pass (signed URLs, secrets/service-role audit, RLS on findings tables VERIFIED org-scoped); fabricated dashboard trend replaced with real control breakdown; double-submit guard on finding review; first-run onboarding checklist; metered monthly AI cost cap (`src/lib/usage/quota.ts`, `STARTER_AI_MONTHLY_CAP`). Deferred to the final fresh-account walkthrough: mobile/responsive check + setting the real cap value. NOTE: the AI findings engine is NOT yet gated to POPIA-only — see the framework/regulation coverage gap in CLAUDE.md (fix before launch).
+
 **Goal:** The unglamorous but essential polish before real users touch it.
 
 **Build / verify:**
