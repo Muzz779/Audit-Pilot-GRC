@@ -247,7 +247,7 @@ export function PoliciesContent({
   };
 
   // ── Use template ──────────────────────────────────────────────────────────
-  const useTemplate = (template: typeof POLICY_TEMPLATES[0]) => {
+  const applyTemplate = (template: typeof POLICY_TEMPLATES[0]) => {
     setCreateForm({ title: template.name, description: template.description, category: template.category, content: '' });
     setActiveTab('all');
     setShowCreateModal(true);
@@ -316,7 +316,7 @@ export function PoliciesContent({
             <Card
               key={i}
               className="card-hover cursor-pointer group"
-              onClick={() => canEdit && useTemplate(t)}
+              onClick={() => canEdit && applyTemplate(t)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
