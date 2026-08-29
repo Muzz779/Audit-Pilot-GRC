@@ -265,6 +265,8 @@ export default function RegisterPage() {
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
             By registering you agree to our{' '}
+            <a href="/terms" className="text-primary hover:underline">Terms of Service</a>
+            {' '}and{' '}
             <a href="/popia" className="text-primary hover:underline">Privacy Policy</a>
             {' '}(POPIA compliant)
           </p>

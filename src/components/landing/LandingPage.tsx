@@ -349,9 +349,9 @@ export function LandingPage() {
               <span className="font-bold text-sm text-gray-900 dark:text-white">AuditPilot</span>
             </div>
             <div className="flex items-center gap-6 text-xs text-gray-500">
-              <a href="#" className="hover:text-gray-900">Privacy Policy</a>
-              <a href="#" className="hover:text-gray-900">Terms of Service</a>
-              <a href="#" className="hover:text-gray-900">POPIA Notice</a>
+              <a href="/popia" className="hover:text-gray-900">Privacy Policy</a>
+              <a href="/terms" className="hover:text-gray-900">Terms of Service</a>
+              <a href="/popia" className="hover:text-gray-900">POPIA Notice</a>
               <a href="mailto:support@auditpilot.co.za" className="hover:text-gray-900">support@auditpilot.co.za</a>
             </div>
             <p className="text-xs text-gray-400">© 2025 AuditPilot. Built in 🇿🇦 South Africa.</p>
