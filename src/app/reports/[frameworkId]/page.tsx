@@ -91,7 +91,7 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
       .eq('framework_id', frameworkId),
     supabase
       .from('findings')
-      .select('id, determination, confidence, severity, title, summary, reasoning, recommendation, evidence_chunk_ids, used_unverified_regulation, reviewed_at, control:controls(control_id, name, category)')
+      .select('id, determination, confidence, severity, title, summary, reasoning, recommendation, evidence_chunk_ids, regulation_chunk_ids, used_unverified_regulation, reviewed_at, control:controls(control_id, name, category)')
       .eq('organisation_id', orgId)
       .eq('framework_id', frameworkId)
       .eq('status', 'accepted'),
@@ -330,11 +330,15 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
                               )}
                             </div>
 
-                            {f.used_unverified_regulation && (
+                            {(!f.regulation_chunk_ids || f.regulation_chunk_ids.length === 0) ? (
+                              <p className="mt-2 text-[10px] text-rose-700">
+                                ⚠ No verified regulation base for {framework?.short_name} — this finding is AI general-knowledge only. Illustrative, not a compliance assessment.
+                              </p>
+                            ) : f.used_unverified_regulation ? (
                               <p className="mt-2 text-[10px] text-amber-700">
                                 ⚠ Assessed against unverified regulation text — confirm against official {framework?.short_name} before acting.
                               </p>
-                            )}
+                            ) : null}
                           </div>
                         );
                       })}

@@ -327,13 +327,20 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
                       {/* Summary */}
                       <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{finding.summary}</p>
 
-                      {/* Unverified regulation warning */}
-                      {finding.used_unverified_regulation && (
+                      {/* Regulation-grounding warning. If the finding cites NO regulation
+                          (non-POPIA frameworks have no regulation base), it is AI general
+                          knowledge only — a stronger caveat than the unverified-text one. */}
+                      {(!finding.regulation_chunk_ids || finding.regulation_chunk_ids.length === 0) ? (
+                        <div className="flex items-start gap-1 mt-2 text-[10px] text-rose-700 dark:text-rose-400">
+                          <ShieldAlert className="w-3 h-3 shrink-0 mt-0.5" />
+                          <span>No verified regulation base for this framework — this finding is AI general-knowledge only. Illustrative, not a compliance assessment. Only POPIA has a regulation base (itself pending legal review).</span>
+                        </div>
+                      ) : finding.used_unverified_regulation ? (
                         <div className="flex items-center gap-1 mt-2 text-[10px] text-amber-700 dark:text-amber-400">
                           <ShieldAlert className="w-3 h-3" />
                           Based on unverified regulation text — confirm against official POPIA before acting
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Expand toggle */}
                       <button
