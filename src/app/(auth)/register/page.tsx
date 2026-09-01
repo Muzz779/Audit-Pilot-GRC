@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Building2, Globe, CheckCircle } from 'lucide-react';
@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 type Step = 'account' | 'organisation';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isInvited = searchParams.get('invited') === 'true';
@@ -345,5 +345,15 @@ export default function RegisterPage() {
         </>
       )}
     </div>
+  );
+}
+
+// useSearchParams() must be inside a Suspense boundary for the production build
+// (Next 15 static-generation requirement).
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }
