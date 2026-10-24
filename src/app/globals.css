@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Editorial display face for marketing pages. Declared UNLAYERED so it reliably
+   wins over Tailwind's layered font utilities regardless of build/HMR ordering.
+   Only sets font-family; weight/size utilities still apply normally. */
+.font-display-serif {
+  font-family: var(--font-serif), 'Source Serif 4', Georgia, 'Times New Roman', serif;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

@@ -62,6 +62,20 @@ module.exports = {
           900: '#0c4a6e',
           950: '#082f49',
         },
+        // Deep "ink" anchor — premium navy that pairs with the brand cyan (matches the sales deck)
+        ink: {
+          50: '#f3f6f8',
+          100: '#e1e9ee',
+          200: '#c3d3dd',
+          300: '#9ab2c1',
+          400: '#6a8599',
+          500: '#4a6679',
+          600: '#365062',
+          700: '#2a3f4f',
+          800: '#18303f',
+          900: '#0e2233',
+          950: '#0b1a27',
+        },
         emerald: {
           50: '#ecfdf5',
           500: '#10b981',
@@ -120,6 +134,7 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         display: ['var(--font-cal-sans)', 'var(--font-inter)', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Source Serif 4', 'Georgia', 'serif'],
         mono: ['var(--font-jetbrains-mono)', 'monospace'],
       },
     },
