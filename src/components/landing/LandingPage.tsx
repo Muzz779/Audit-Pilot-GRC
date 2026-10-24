@@ -30,17 +30,17 @@ const FRAMEWORKS = [
   { name: 'NIST CSF', icon: '🔐', desc: 'Cybersecurity framework' },
 ];
 
-const TESTIMONIALS = [
-  { name: 'Thabo Mokoena', title: 'CISO, Nedbank Digital', quote: 'AuditPilot cut our POPIA audit prep from 6 weeks to 3 days. The AI policy drafter alone paid for itself in the first month.', avatar: 'TM' },
-  { name: 'Priya Naidoo', title: 'Head of Risk, Discovery Limited', quote: 'Finally a GRC tool that understands South African regulations. The POPIA framework is comprehensive and the team loves the risk heat map.', avatar: 'PN' },
-  { name: 'Marco van der Berg', title: 'IT Director, Capitec Bank', quote: 'We went from zero to ISO 27001 readiness in 4 months using AuditPilot. The evidence repository and audit trails made our external audit seamless.', avatar: 'MV' },
+const DIFFERENTIATORS = [
+  { icon: '🔍', title: 'Evidence-based, not guesswork', body: 'Every finding is traced back to the exact document and page it came from — so you can defend it in a real audit, not just trust a chatbot.' },
+  { icon: '🙋🏽', title: 'You stay in control', body: 'AuditPilot produces draft findings. A qualified person on your team reviews and accepts each one before it becomes part of your compliance record.' },
+  { icon: '🇿🇦', title: 'Built for South Africa', body: 'POPIA-first, written in South African English, and billed in ZAR via PayFast — made for local compliance teams, not adapted from abroad.' },
 ];
 
 const STATS = [
-  { value: '2,400+', label: 'South African businesses trust us' },
-  { value: '98%', label: 'Audit pass rate for our customers' },
-  { value: '73hrs', label: 'Saved per compliance cycle on average' },
-  { value: 'R10M', label: 'POPIA fine exposure avoided' },
+  { value: 'POPIA', label: 'Purpose-built for SA privacy law' },
+  { value: 'Cited', label: 'Every finding linked to document & page' },
+  { value: 'Human-led', label: 'You review & accept every finding' },
+  { value: 'ZAR', label: 'Billed locally via PayFast' },
 ];
 
 export function LandingPage() {
@@ -52,7 +52,7 @@ export function LandingPage() {
     { q: 'How does PayFast billing work?', a: 'We use PayFast for secure recurring billing in ZAR. Cancel anytime with no lock-in. Your first payment is processed immediately and renews monthly on the same date.' },
     { q: 'Can I import my existing policies and risk registers?', a: 'Yes. You can bulk import policies via our template library or paste content directly. CSV import for risk registers is on our roadmap for Q2 2025.' },
     { q: 'Is there a free trial?', a: 'The Starter plan is permanently free for small teams. Pro plans include a 14-day trial with full access — no credit card required to start.' },
-    { q: 'What frameworks do you support?', a: 'POPIA, ISO 27001, SOC 2, GDPR, King IV, NIS2, PCI-DSS, NIST CSF, and more being added regularly. Enterprise customers can request custom framework mapping.' },
+    { q: 'What frameworks do you support?', a: 'POPIA is our fully supported framework for evidence-based AI auditing today — findings are cited to your own documents and to the relevant POPIA sections. You can also track ISO 27001, SOC 2, GDPR, King IV, NIS2, PCI-DSS and NIST CSF in the platform, with AI-backed auditing for each rolling out as its regulation base is prepared and reviewed.' },
     { q: 'How secure is my compliance data?', a: 'Enterprise-grade security: AES-256 encryption at rest and in transit, Row Level Security so tenants are completely isolated, MFA support, and regular penetration testing.' },
   ];
 
@@ -230,21 +230,16 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Why teams choose AuditPilot */}
       <section className="py-20 px-4 max-w-6xl mx-auto">
-        <h2 className="text-2xl font-extrabold text-center text-gray-900 dark:text-white mb-10">Trusted by South African compliance teams</h2>
+        <h2 className="text-2xl font-extrabold text-center text-gray-900 dark:text-white mb-3">Why teams choose evidence-based auditing</h2>
+        <p className="text-center text-gray-500 mb-10 max-w-2xl mx-auto text-sm">A wrong &ldquo;you&rsquo;re compliant&rdquo; answer has real legal consequences. AuditPilot is built to be accurate and defensible, not just impressive.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map(t => (
-            <div key={t.name} className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <div className="flex mb-3">{[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />)}</div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">"{t.quote}"</p>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-300 flex items-center justify-center text-white text-sm font-bold">{t.avatar}</div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{t.name}</p>
-                  <p className="text-xs text-gray-500">{t.title}</p>
-                </div>
-              </div>
+          {DIFFERENTIATORS.map(d => (
+            <div key={d.title} className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm">
+              <div className="text-3xl mb-3">{d.icon}</div>
+              <p className="text-base font-semibold text-gray-900 dark:text-white mb-2">{d.title}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{d.body}</p>
             </div>
           ))}
         </div>
