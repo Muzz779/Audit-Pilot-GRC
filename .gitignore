@@ -44,3 +44,6 @@ yarn-error.log*
 
 # Supabase
 .supabase
+
+# Internal sales/demo kit — sample files + demo script (not for the public repo)
+demo-kit/
