@@ -13,19 +13,16 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <span className="text-lg font-bold">AuditPilot</span>
         </Link>
         <div className="flex-1 flex flex-col justify-center">
-          <blockquote className="text-2xl font-light leading-relaxed mb-8 text-brand-100">
-            "The only GRC platform that truly understands South African compliance requirements."
+          <blockquote className="text-3xl font-light leading-snug mb-6 text-white">
+            Compliance you can <span className="font-semibold">prove</span>, not just claim.
           </blockquote>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">NK</div>
-            <div>
-              <p className="font-semibold text-sm">Nomsa Khumalo</p>
-              <p className="text-xs text-brand-200">Chief Compliance Officer, Old Mutual</p>
-            </div>
-          </div>
+          <p className="text-sm leading-relaxed text-brand-100 max-w-sm">
+            An evidence-based AI auditor for POPIA. Upload the policies you already have and get
+            traceable, cited findings against the Act — reviewed and accepted by your team.
+          </p>
         </div>
         <div className="grid grid-cols-3 gap-4 mt-8">
-          {[['🇿🇦', 'POPIA Ready'], ['🔒', 'ISO 27001'], ['🛡️', 'SOC 2']].map(([icon, label]) => (
+          {[['🇿🇦', 'POPIA-first'], ['📄', 'Cited findings'], ['✅', 'Human-reviewed']].map(([icon, label]) => (
             <div key={label} className="text-center p-3 rounded-xl bg-white/10">
               <div className="text-xl mb-1">{icon}</div>
               <p className="text-xs text-brand-100">{label}</p>

@@ -40,7 +40,7 @@ const FRAMEWORKS = [
 ];
 
 const PILLARS = [
-  { icon: Fingerprint, title: 'Evidence-based, not guesswork', body: 'Every finding is traced back to the exact document and page it came from — so you can defend it, not just trust a chatbot.' },
+  { icon: Fingerprint, title: 'Evidence-based, not guesswork', body: 'Every finding traces back to the exact document and page it came from — and when the evidence isn’t there, it says so instead of guessing. Defensible, not just plausible.' },
   { icon: Scale, title: 'You stay in control', body: 'AuditPilot produces draft findings. Your qualified reviewer accepts each one before it becomes part of your compliance record.' },
   { icon: Shield, title: 'Built for South Africa', body: 'POPIA-first, written in South African English, and billed in ZAR via PayFast — made for local teams, not adapted from abroad.' },
 ];
@@ -54,7 +54,7 @@ export function LandingPage() {
     { q: 'How does AuditPilot avoid “hallucinated” compliance answers?', a: 'It only answers from evidence it can retrieve from your documents and the regulation base, and it cites the source every time. When the evidence does not cover a requirement, it says so rather than guessing — and every finding is a draft a human must accept.' },
     { q: 'Is the POPIA content legally verified?', a: 'The POPIA knowledge base was drafted from the public text of the Act and is clearly marked as unverified until a qualified practitioner reviews it. AuditPilot shows that notice wherever the regulation is used — we would rather be transparent than overstate.' },
     { q: 'How does PayFast billing work?', a: 'Billing is in ZAR via PayFast — no forex and no overseas cards. Start on the free plan, upgrade when it is proving its worth, and cancel anytime with no lock-in.' },
-    { q: 'Where does my compliance data live?', a: 'Each organisation’s data is encrypted and isolated using row-level security, evidence files are served through short-lived signed links rather than public URLs, and access is controlled per role.' },
+    { q: 'Where does my compliance data live?', a: 'Each organisation’s data is encrypted and isolated using row-level security, evidence files are served through short-lived signed links rather than public URLs, and access is controlled per role. Your uploaded documents are used only to generate your findings — we don’t use them to train any AI models, and they’re never shared with other organisations. AI processing runs on Anthropic (Claude) and Voyage AI under their commercial API terms.' },
     { q: 'Can I import my existing policies and registers?', a: 'Yes — upload your policy and evidence PDFs directly, or start from the built-in policy templates and customise them. Your uploaded documents are what the AI audits against.' },
   ];
 
@@ -212,8 +212,9 @@ export function LandingPage() {
             A wrong “you&apos;re compliant” has real legal consequences.
           </h2>
           <p className="text-ink-500 dark:text-ink-300 leading-relaxed">
-            So AuditPilot is built to be accurate and defensible before it&apos;s built to impress.
-            Three principles make the difference.
+            So AuditPilot is built to be accurate and defensible before it&apos;s built to impress —
+            it&apos;s decision-support for your qualified reviewer, not a law firm, and nothing it
+            produces is legal advice. Three principles make the difference.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -308,7 +309,7 @@ export function LandingPage() {
         <div className="text-center max-w-2xl mx-auto mb-12">
           <p className="text-xs font-semibold tracking-[0.18em] uppercase text-brand-600 mb-3">Pricing</p>
           <h2 className="font-display-serif text-3xl sm:text-4xl font-semibold tracking-tight text-ink-900 dark:text-white mb-3">Simple pricing, in Rand.</h2>
-          <p className="text-ink-500 dark:text-ink-300">Billed monthly via PayFast. Start free, upgrade when it&apos;s proving its worth.</p>
+          <p className="text-ink-500 dark:text-ink-300">Billed monthly in ZAR via PayFast. Pro costs less than a compliance consultant&apos;s day rate — start free, upgrade when it&apos;s proving its worth.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 items-start">
           {Object.values(PRICING_PLANS).map(plan => (
@@ -348,7 +349,7 @@ export function LandingPage() {
             </div>
           ))}
         </div>
-        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-7">All prices exclude VAT · Processed securely by PayFast · Cancel anytime</p>
+        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-7">Starter is free forever. Pro is R799/mo excl. VAT (≈ R919 incl.), billed in ZAR via PayFast — cancel anytime, no lock-in. Need more seats, SSO or a dedicated instance? Talk to us about Enterprise.</p>
       </section>
 
       {/* ── FAQ ─────────────────────────────────────────────────────── */}
