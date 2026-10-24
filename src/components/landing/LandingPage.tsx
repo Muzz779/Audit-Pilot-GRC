@@ -408,6 +408,7 @@ export function LandingPage() {
             <span className="font-display-serif font-semibold text-ink-900 dark:text-white">AuditPilot</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-5 text-xs text-ink-500 dark:text-ink-400">
+            <a href="/security" className="hover:text-ink-900 dark:hover:text-white">Security</a>
             <a href="/popia" className="hover:text-ink-900 dark:hover:text-white">Privacy Policy</a>
             <a href="/terms" className="hover:text-ink-900 dark:hover:text-white">Terms of Service</a>
             <a href="/popia" className="hover:text-ink-900 dark:hover:text-white">POPIA Notice</a>
