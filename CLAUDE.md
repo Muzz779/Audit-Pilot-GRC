@@ -27,11 +27,17 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - **Private storage bucket**: files are downloaded server-side via service-role client using the stored storage PATH, not fetched via public URL. `file_url` stores the path, not a public URL.
 - **unpdf splits by real page** (`mergePages: false`) — this is what makes citations page-accurate. Critical; don't break it.
 - **Re-analyzing a document must delete old chunks first** or chunks accumulate and eventually blow Voyage's token limit.
-- **Embedding batches** are capped by both input count (128) and total chars (~350k) to stay under Voyage limits. Rate limits and outages are retried in `embeddings.ts`, inside the 120s route limit.
+- **Embedding batches** are capped by input count (128) and by estimated tokens (4,500), which counts digits and punctuation heavily: ledger text uses about twice the tokens of prose. A request bigger than the account's tokens-per-minute limit can never succeed however long it retries.
+- **Analysis runs in steps from the browser**, like Run Full Audit. A step embeds for up to 20s, saves, and returns `continue`. A rate limit is not a failure: the step returns `rate_limited` and the browser waits 20s. Try Again resumes from the saved chunks. A step must never wait long enough for the route limit to kill it, because a killed step loses its work and leaves the row in `processing`.
+- **Run Full Audit does the same**: a rate-limited control stays at the front of the queue and is retried, so it isn't counted as failed.
+- **A scanned reading is kept** at `<storage path>.ocr.json` between steps, so OCR runs once. It is `text/plain` because the bucket's allowed types exclude JSON, and it's removed on completion and when the evidence is deleted.
 - **The chunker must never drop text.** Heading detection only labels a section. It used to delete heading-like lines, so short real evidence ("Approved by: ...", list items) never reached the AI and could produce false gaps.
 - **Spreadsheets** (XLSX via exceljs, CSV via our own parser) are cited by sheet and row range, Word files by section. `page_number` is null for these: never fake a "Page 1". Old `.xls` and `.doc` get a clear "re-save" error. Do not use the npm `xlsx` package (unpatched CVEs, and we parse customer uploads).
-- **Scanned PDF pages** are read by Claude OCR (`extraction.ts`). Anything unread must surface as a warning, never be dropped quietly. Limit: about 10-15 scanned pages per run (8,000 output tokens), and the remainder is reported as unread.
-- **Re-analyzing or deleting a document replaces its chunks**, so existing findings lose that citation. The UI warns about this and the board report says so.
+- **Scanned PDF pages** are read by Claude OCR (`extraction.ts`). Anything unread must surface as a warning, never be dropped quietly. Limit: about 10-15 scanned pages per run (8,000 output tokens, 100s timeout), and the remainder is reported as unread.
+- **Re-analyzing or deleting a document replaces its chunks**, so existing findings lose that citation. The UI warns about this and the board report says so per finding, including when only some citations were lost.
+- **The live database can differ from `schema.sql`.** `organisations` was readable by everyone on live although the file says otherwise. Test rules with a real session; don't trust the file.
+- **Row rules can't limit columns.** Protect access fields on `profiles` with the trigger in migration 004, and never let the browser say which organisation an account belongs to. Invitations join on the server (`/api/team/invite`).
+- **Free-tier Voyage is 3 calls a minute and 10K tokens a minute.** Everything above works at that speed, but slowly.
 - **No new vendors / no scope creep** without flagging it to the human first.
 
 ## What is BUILT and VALIDATED (working, tested on real docs)
@@ -49,6 +55,7 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 3. `supabase/seed_popia_regulations.sql` — 8 POPIA sections (unverified)
 4. `supabase/migration_002_findings.sql` — control_regulation_map, findings, finding_history
 5. `supabase/migration_003_audit_runs.sql` — audit_runs (batch tracking)
+6. `supabase/migration_004_tenant_isolation.sql` — evidence file isolation, organisations visibility, profile access-field trigger
 Then run `npm run embed-regulations` once to populate regulation embeddings.
 
 > NOTE: migrations 002 and 003 have been applied directly in the live Supabase project, but the `.sql` files are NOT yet committed to this repo — so a fresh environment cannot be rebuilt from source alone. Reconstructing and committing them from the live schema is outstanding tech-debt (findings table columns are currently inferable only from code: `findings` has `control_id`→controls.id, `framework_id`, `determination`, `status`, `reviewed_by/at`, `review_note`).
@@ -62,6 +69,7 @@ Then run `npm run embed-regulations` once to populate regulation embeddings.
 - Analyze: `src/app/api/evidence/analyze/route.ts`
 
 ## Roadmap — what's LEFT (Phases 4–6 are DONE; remaining below)
+- **⚠️ Run migration 004 on live (CRITICAL, check whether done).** Before it, any signed-in user can list other organisations' evidence files and change their own organisation, role and platform-admin flag.
 - **⚠️ Framework/regulation coverage gap (LIABILITY — highest open risk):** `compliance_frameworks` seeds 8 frameworks (POPIA, GDPR, ISO 27001, SOC 2, NIS2, PCI-DSS, King IV, NIST CSF), but ONLY POPIA has a regulation knowledge base (`seed_popia_regulations.sql` / `regulation_chunks`). There is currently NO gate stopping a user from running the AI findings engine / Run Full Audit on a non-POPIA framework — the engine finds zero governing regulation, so findings are grounded only in evidence + Claude's general knowledge, NOT cited to any regulation, and because `regulationChunks` is empty `used_unverified_regulation` is `false` so no warning even shows. FIX before launch: gate the findings/audit engine (UI + server) to frameworks that actually have a regulation base (POPIA). See engine `src/lib/findings/engine.ts` (`match_regulation_chunks` by `framework_id`).
 - **Legal review of POPIA seed data** before any live customer — non-negotiable (stays `is_verified: false`, keep unverified warnings).
 - **More frameworks** (GDPR, ISO 27001, etc.) — GATED on building a regulation base for each AND legal review of it; adding unverified frameworks multiplies liability. Do not do this without the human confirming legal review.
