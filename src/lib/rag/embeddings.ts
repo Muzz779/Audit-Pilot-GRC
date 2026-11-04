@@ -15,9 +15,10 @@ const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'voyage-3-lite'; // 1536 dimensions, cost-efficient, good for retrieval
 
 // How long one analysis step may spend embedding, rate-limit waits included.
-// Keeps a step inside the route's 120s limit, so it fails with a clear
-// message instead of being killed mid-way.
-const DOCUMENT_DEADLINE_MS = 100_000;
+// The live platform cut steps off at about 60s whatever maxDuration says, and
+// a killed step loses its work, so a step gives up well before that. The
+// browser waits and sends the next step, which is what gets past a rate limit.
+const DOCUMENT_DEADLINE_MS = 30_000;
 // A search query is one short call, so it waits less
 const QUERY_DEADLINE_MS = 25_000;
 
@@ -43,6 +44,8 @@ interface VoyageEmbeddingResponse {
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+class VoyageRateLimitError extends Error {}
 
 /**
  * POST to Voyage, waiting out rate limits and brief outages. The rate limit
@@ -77,7 +80,7 @@ async function postToVoyage(
 
     if (!retryable || Date.now() + waitMs > deadlineAt) {
       if (response.status === 429) {
-        throw new Error(
+        throw new VoyageRateLimitError(
           'The document search service is at its rate limit right now. Please wait a minute and try again. ' +
           'Very large documents may need to be split into smaller files.'
         );
@@ -203,12 +206,18 @@ export async function embedTexts(
 /**
  * Embed as many leading texts as possible in one analysis step, and return
  * their vectors. The caller saves them and comes back for the rest, so a file
- * of any size finishes at whatever speed the Voyage plan allows.
+ * of any size finishes at whatever speed the Voyage plan allows. A rate limit
+ * is not a failure here: `rateLimited` tells the caller to wait before the
+ * next step, even if nothing was embedded in this one.
  */
-export async function embedWithinBudget(texts: string[], budgetMs: number): Promise<number[][]> {
+export async function embedWithinBudget(
+  texts: string[],
+  budgetMs: number
+): Promise<{ embeddings: number[][]; rateLimited: boolean }> {
   const startedAt = Date.now();
   const deadlineAt = startedAt + DOCUMENT_DEADLINE_MS;
   const embedded: number[][] = [];
+  let rateLimited = false;
 
   while (embedded.length < texts.length && (embedded.length === 0 || Date.now() - startedAt < budgetMs)) {
     const group: string[] = [];
@@ -223,13 +232,17 @@ export async function embedWithinBudget(texts: string[], budgetMs: number): Prom
     try {
       embedded.push(...await embedTexts(group, deadlineAt));
     } catch (err) {
+      if (err instanceof VoyageRateLimitError) {
+        rateLimited = true;
+        break;
+      }
       // Keep what this step finished. The next step picks up from there.
       if (embedded.length > 0) break;
       throw err;
     }
   }
 
-  return embedded;
+  return { embeddings: embedded, rateLimited };
 }
 
 /**

@@ -5,9 +5,10 @@ import { chunkDocument } from '@/lib/rag/chunking';
 import { embedWithinBudget } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
-export const maxDuration = 120; // one step of an analysis, see STEP_BUDGET_MS
+export const maxDuration = 60; // one step of an analysis, see STEP_BUDGET_MS
 
-const STALE_ANALYSIS_MS = 5 * 60 * 1000;
+// Every step refreshes requested_at, so this only passes once steps have stopped
+const STALE_ANALYSIS_MS = 2 * 60 * 1000;
 const CHUNK_INSERT_BATCH = 200; // keeps each insert under the database request size limit
 // Analysis runs in steps, like Run Full Audit: each request embeds what it can
 // in this time and saves it, then the browser asks for the next step. Large
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
 
     // ── Step 5: Embed and save the next group of chunks ───────────────
     const remaining = chunks.slice(alreadySaved);
-    const embeddings = await embedWithinBudget(remaining.map(c => c.text), STEP_BUDGET_MS);
+    const { embeddings, rateLimited } = await embedWithinBudget(remaining.map(c => c.text), STEP_BUDGET_MS);
 
     // Use the service role client for the bulk insert to avoid RLS
     // overhead on a potentially large batch.
@@ -215,7 +216,12 @@ export async function POST(req: NextRequest) {
           'This scanned document is too large to finish in one pass right now. Please split it into smaller parts.'
         );
       }
-      return NextResponse.json({ continue: true, processed: savedSoFar, total: chunks.length });
+      return NextResponse.json({
+        continue: true,
+        processed: savedSoFar,
+        total: chunks.length,
+        rate_limited: rateLimited,
+      });
     }
 
     // ── Step 6: Mark analysis as completed ─────────────────────────────

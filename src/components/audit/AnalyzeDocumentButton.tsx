@@ -14,6 +14,11 @@ interface AnalyzeDocumentButtonProps {
 
 type Status = 'not_started' | 'pending' | 'processing' | 'completed' | 'failed';
 
+// The search service limits calls per minute. When a step reports that limit,
+// wait for it to clear before sending the next step.
+const RATE_LIMIT_WAIT_MS = 20_000;
+const MAX_STALLED_STEPS = 6;
+
 export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete }: AnalyzeDocumentButtonProps) {
   const [status, setStatus] = useState<Status>('not_started');
   const [chunkCount, setChunkCount] = useState<number | null>(null);
@@ -43,7 +48,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
     return () => { cancelled = true; };
   }, [evidenceId]);
 
-  const handleAnalyze = async (reanalyze = false) => {
+  const handleAnalyze = async (reanalyze = false, continuing = false) => {
     setAnalyzing(true);
     setStatus('processing');
     setErrorMessage(null);
@@ -52,7 +57,9 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
       // Large files take several steps: the server saves what it finished and
       // says `continue`, so a dropped step can be resumed with Try Again.
       let data: any;
-      let resume = false;
+      let resume = continuing;
+      let lastProcessed = -1;
+      let stalledSteps = 0;
       while (true) {
         const res = await fetch('/api/evidence/analyze', {
           method: 'POST',
@@ -69,6 +76,15 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
 
         setProgress(Math.round((data.processed / data.total) * 100));
         resume = true;
+
+        if (data.rate_limited) {
+          stalledSteps = data.processed > lastProcessed ? 0 : stalledSteps + 1;
+          if (stalledSteps >= MAX_STALLED_STEPS) {
+            throw new Error('The document search service is busy. Try Again in a few minutes to continue from where it stopped.');
+          }
+          await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
+        }
+        lastProcessed = data.processed;
       }
 
       setStatus('completed');
@@ -149,7 +165,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
         {errorMessage && (
           <p className="text-[10px] text-muted-foreground max-w-xs">{errorMessage}</p>
         )}
-        <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleAnalyze()}>
+        <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleAnalyze(false, true)}>
           <Sparkles className="w-3 h-3" /> Try Again
         </Button>
       </div>
