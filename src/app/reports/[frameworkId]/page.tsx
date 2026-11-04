@@ -297,6 +297,10 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
                     <div className="space-y-3">
                       {group.items.map((f: any) => {
                         const cites = citationsFor(f);
+                        // Re-analysing or deleting a document removes its chunks.
+                        // Say so, so a shorter citation list can't pass unnoticed.
+                        const lostCitations = ((f.evidence_chunk_ids || []) as string[])
+                          .filter((id) => !citationByChunk.has(id)).length;
                         return (
                           <div key={f.id} className="finding-block rounded-lg border border-gray-200 p-4">
                             <div className="flex flex-wrap items-center gap-2">
@@ -319,7 +323,14 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
                               <div>
                                 <span className="font-semibold text-gray-700">Evidence cited: </span>
                                 {cites.length > 0 ? (
-                                  <span className="text-gray-600">{cites.join('; ')}</span>
+                                  <span className="text-gray-600">
+                                    {cites.join('; ')}
+                                    {lostCitations > 0 && (
+                                      <span className="italic text-amber-700">
+                                        {' '}Plus {lostCitations} cited passage{lostCitations !== 1 ? 's' : ''} from a document since deleted or re-analysed. Run this control again to restore {lostCitations !== 1 ? 'them' : 'it'}.
+                                      </span>
+                                    )}
+                                  </span>
                                 ) : (
                                   <span className="italic text-gray-400">
                                     {(f.evidence_chunk_ids || []).length > 0
