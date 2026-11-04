@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// The search service limits calls per minute. When a step reports that limit,
+// wait for it to clear and run the same control again.
+const RATE_LIMIT_WAIT_MS = 20_000;
+const MAX_RATE_LIMIT_RETRIES = 6;
+
 interface RunFullAuditProps {
   frameworkId: string;
   frameworkName: string;
@@ -70,6 +75,8 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
       // 2. Step through the queue, one control per request
       let done = false;
       let quotaMessage = '';
+      let rateLimitRetries = 0;
+      let lastError = '';
       while (!done && !cancelRef.current) {
         const stepRes = await fetch('/api/audit-runs/step', {
           method: 'POST',
@@ -82,6 +89,18 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
           toast.error(stepData.error || 'Audit step failed');
           break;
         }
+
+        if (stepData.rate_limited) {
+          rateLimitRetries++;
+          if (rateLimitRetries > MAX_RATE_LIMIT_RETRIES) {
+            toast.error('The document search service is busy. Run Full Audit again in a few minutes to continue.');
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_WAIT_MS));
+          continue;
+        }
+        rateLimitRetries = 0;
+        if (stepData.last_error) lastError = stepData.last_error;
 
         done = stepData.done;
         if (stepData.quota_exceeded) quotaMessage = stepData.message || 'Monthly AI limit reached.';
@@ -111,6 +130,11 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
         toast('Audit stopped. Findings generated so far have been saved.', { icon: '⏸️' });
       } else if (quotaMessage) {
         toast(quotaMessage, { icon: '🚫' });
+      } else if (done && current.failed > 0) {
+        toast.error(
+          `${current.failed} control(s) could not be analyzed, so they have no finding. Run Full Audit again to retry them. ${lastError}`,
+          { duration: 15_000 }
+        );
       } else if (done) {
         toast.success('Full audit complete — review the draft findings below');
       }
@@ -128,8 +152,9 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
     cancelRef.current = true;
   };
 
+  const handled = state ? state.processed + state.failed : 0;
   const progressPct = state && state.toProcess > 0
-    ? Math.round((state.processed / state.toProcess) * 100)
+    ? Math.round((handled / state.toProcess) * 100)
     : 0;
 
   return (
@@ -160,7 +185,7 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
             {running && <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />}
             <span className="text-xs text-muted-foreground">
               {running
-                ? `Analyzing control ${state.processed + 1} of ${state.toProcess}...`
+                ? `Analyzing control ${Math.min(handled + 1, state.toProcess)} of ${state.toProcess}...`
                 : `Processed ${state.processed} of ${state.toProcess} controls`}
               {state.lastControl && running && (
                 <span className="text-muted-foreground/70"> — last: {state.lastControl}</span>

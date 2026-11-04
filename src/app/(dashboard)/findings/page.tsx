@@ -33,6 +33,11 @@ export default async function FindingsPage() {
       .order('generated_at', { ascending: false }),
   ]);
 
+  // Control ids sort as text in the database, which puts POPIA-10 before POPIA-2
+  const orderedControls = [...(controls || [])].sort((a: any, b: any) =>
+    a.control_id.localeCompare(b.control_id, undefined, { numeric: true })
+  );
+
   return (
     <div className="flex flex-col">
       <Topbar
@@ -41,7 +46,7 @@ export default async function FindingsPage() {
       />
       <FindingsContent
         frameworks={frameworks || []}
-        controls={controls || []}
+        controls={orderedControls}
         initialFindings={findings || []}
         orgId={orgId}
         userRole={profile?.role || 'viewer'}

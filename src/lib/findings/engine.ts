@@ -201,7 +201,7 @@ Assess whether this control is satisfied by the evidence. Respond with only the 
 
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 1500,
+    max_tokens: 2500,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
@@ -211,9 +211,8 @@ Assess whether this control is satisfied by the evidence. Respond with only the 
   // ── Step 7: Parse Claude's JSON response safely ───────────────────
   let parsed: any;
   try {
-    // Strip any accidental markdown fences
-    const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    parsed = JSON.parse(cleaned);
+    // Take only the JSON object, in case the reply has fences or text around it
+    parsed = JSON.parse(rawText.slice(rawText.indexOf('{'), rawText.lastIndexOf('}') + 1));
   } catch {
     throw new Error('The findings engine returned an unparseable response. Please try analyzing this control again.');
   }

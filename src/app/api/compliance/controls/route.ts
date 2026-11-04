@@ -23,5 +23,9 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  // Control ids sort as text in the database, which puts POPIA-10 before POPIA-2
+  const ordered = [...(data || [])].sort((a: any, b: any) =>
+    a.control_id.localeCompare(b.control_id, undefined, { numeric: true })
+  );
+  return NextResponse.json({ data: ordered });
 }

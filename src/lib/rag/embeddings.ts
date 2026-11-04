@@ -44,7 +44,7 @@ interface VoyageEmbeddingResponse {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-class VoyageRateLimitError extends Error {}
+export class VoyageRateLimitError extends Error {}
 
 /**
  * POST to Voyage, waiting out rate limits and brief outages. The rate limit

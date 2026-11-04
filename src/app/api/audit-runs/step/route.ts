@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { analyzeControl } from '@/lib/findings/engine';
+import { VoyageRateLimitError } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
 export const maxDuration = 60; // one control comfortably fits in 60s
@@ -167,6 +168,12 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
+    // A rate limit says nothing about this control. Leave it at the front of
+    // the queue so the browser can wait and run it again.
+    if (err instanceof VoyageRateLimitError) {
+      return NextResponse.json({ done: false, run, rate_limited: true, last_control: control.name });
+    }
+
     // A single control failed — record it, advance the queue, keep going.
     // The batch does NOT die because of one control.
     console.error(`Audit run ${run_id}: control ${controlId} failed:`, err.message);
