@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import {
   Upload, CheckCircle2, Clock, Plus, Download, FolderOpen,
   Shield, Calendar, BarChart3, AlertCircle, FileText, File,
-  Loader2, ExternalLink, ClipboardList,
+  Loader2, ExternalLink, ClipboardList, Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,8 @@ export function AuditContent({
 
   const supabase = createClient();
   const canEdit = ['owner', 'admin', 'member', 'auditor'].includes(userRole);
+  const canDelete = ['owner', 'admin', 'member'].includes(userRole);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ── Dropzone ────────────────────────────────────────────────────────────
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
@@ -162,6 +164,28 @@ export function AuditContent({
     } finally {
       setUploading(false);
       setUploadProgress('');
+    }
+  };
+
+  // ── Delete evidence handler ─────────────────────────────────────────────
+  const handleDeleteEvidence = async (item: any) => {
+    const confirmed = window.confirm(
+      `Delete "${item.name}"? This permanently removes the file and its searchable text. Findings that cite it will lose that citation.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    try {
+      const res = await fetch(`/api/evidence/${item.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+
+      setEvidence(prev => prev.filter(e => e.id !== item.id));
+      toast.success('Evidence deleted');
+    } catch (err: any) {
+      toast.error(err.message || 'Delete failed');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -389,16 +413,31 @@ export function AuditContent({
                         <div className="mt-2.5 pt-2.5 border-t border-border/50">
                           <AnalyzeDocumentButton evidenceId={ev.id} hasFile={!!ev.file_url} />
                         </div>
-                        {ev.file_url && (
-                          <a
-                            href={`/api/evidence/${ev.id}/download`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 flex items-center gap-1 text-[11px] text-brand-600 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <ExternalLink className="w-3 h-3" /> View file
-                          </a>
-                        )}
+                        <div className="mt-2 flex items-center gap-3">
+                          {ev.file_url && (
+                            <a
+                              href={`/api/evidence/${ev.id}/download`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[11px] text-brand-600 hover:underline"
+                            >
+                              <ExternalLink className="w-3 h-3" /> View file
+                            </a>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEvidence(ev)}
+                              disabled={deletingId === ev.id}
+                              className="flex items-center gap-1 text-[11px] text-rose-600 hover:underline disabled:opacity-50"
+                            >
+                              {deletingId === ev.id
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Trash2 className="w-3 h-3" />}
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -546,7 +585,7 @@ export function AuditContent({
                       {isDragActive ? 'Drop it here' : 'Drag & drop or click to select'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      PDF, Word, Excel, CSV, Images — max 50MB
+                      PDF, Word (.docx), Excel (.xlsx), CSV, Images — max 50MB
                     </p>
                   </>
                 )}

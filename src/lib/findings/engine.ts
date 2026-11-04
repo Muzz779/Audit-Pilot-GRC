@@ -223,7 +223,8 @@ Assess whether this control is satisfied by the evidence. Respond with only the 
 
   const evidenceSummary = evidenceChunks.map((c, i) => {
     const docName = evidenceNameMap.get(c.evidence_id) || 'Unknown';
-    const loc = c.page_number ? ` (Page ${c.page_number})` : '';
+    const where = c.page_number ? `Page ${c.page_number}` : c.section_title;
+    const loc = where ? ` (${where})` : '';
     return `[EV-${i + 1}] ${docName}${loc}`;
   }).join('; ');
 

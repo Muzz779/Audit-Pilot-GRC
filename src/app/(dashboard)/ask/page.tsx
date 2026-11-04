@@ -26,7 +26,7 @@ export default async function AskPage() {
     <div className="flex flex-col">
       <Topbar
         title="Ask AuditPilot"
-        subtitle="Evidence-grounded answers with citations — Phase 1 preview"
+        subtitle="Evidence-grounded answers with citations"
       />
       <div className="p-6 max-w-4xl mx-auto w-full space-y-4">
         {(analyzedCount || 0) === 0 && (

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Send, Loader2, FileText, BookOpen, AlertTriangle,
   ChevronDown, ChevronUp, ShieldAlert, Sparkles,
@@ -139,7 +140,8 @@ export function AskAuditPilot({ orgId }: { orgId: string }) {
               </div>
               <div className="flex-1 min-w-0 space-y-2">
                 <div className={cn(
-                  'rounded-xl px-3 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                  'rounded-xl px-3 py-2.5 text-sm leading-relaxed',
+                  '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-1 [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h1]:mb-1 [&_h2]:mb-1 [&_h3]:mb-1',
                   result.had_sufficient_evidence ? 'bg-muted text-foreground' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-300'
                 )}>
                   {!result.had_sufficient_evidence && (
@@ -147,7 +149,7 @@ export function AskAuditPilot({ orgId }: { orgId: string }) {
                       <AlertTriangle className="w-3.5 h-3.5" /> Insufficient evidence
                     </div>
                   )}
-                  {result.answer}
+                  <ReactMarkdown>{result.answer}</ReactMarkdown>
                 </div>
 
                 {/* Citations toggle */}

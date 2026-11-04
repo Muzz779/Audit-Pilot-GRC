@@ -7,6 +7,9 @@ import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quo
 
 export const maxDuration = 120; // this can take a while for larger documents
 
+const STALE_ANALYSIS_MS = 5 * 60 * 1000;
+const CHUNK_INSERT_BATCH = 200; // keeps each insert under the database request size limit
+
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -30,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
-  const { evidence_id } = body;
+  const { evidence_id, reanalyze } = body;
 
   if (!evidence_id) {
     return NextResponse.json({ error: 'evidence_id is required' }, { status: 400 });
@@ -62,13 +65,17 @@ export async function POST(req: NextRequest) {
     .eq('evidence_id', evidence_id)
     .maybeSingle();
 
-  if (existingAnalysis?.status === 'completed') {
+  if (existingAnalysis?.status === 'completed' && !reanalyze) {
     return NextResponse.json({
-      error: 'This document has already been analyzed. Delete the existing analysis first to re-analyze.',
+      error: 'This document has already been analyzed. Use Re-analyze to run it again.',
     }, { status: 400 });
   }
 
-  if (existingAnalysis?.status === 'processing') {
+  // A run killed by the platform timeout never reaches the catch below, so an
+  // old "processing" row is dead. Without this, the document stays stuck forever.
+  const startedAt = existingAnalysis?.requested_at ? new Date(existingAnalysis.requested_at).getTime() : 0;
+  const stillRunning = Date.now() - startedAt < STALE_ANALYSIS_MS;
+  if (existingAnalysis?.status === 'processing' && stillRunning) {
     return NextResponse.json({ error: 'Analysis is already in progress for this document.' }, { status: 400 });
   }
 
@@ -162,30 +169,31 @@ export async function POST(req: NextRequest) {
       throw new Error(`Failed to remove existing document chunks: ${deleteError.message}`);
     }
 
-    const { error: insertError } = await serviceClient
-      .from('document_chunks')
-      .insert(chunkRows);
+    for (let i = 0; i < chunkRows.length; i += CHUNK_INSERT_BATCH) {
+      const { error: insertError } = await serviceClient
+        .from('document_chunks')
+        .insert(chunkRows.slice(i, i + CHUNK_INSERT_BATCH));
 
-    if (insertError) {
-      throw new Error(`Failed to store document chunks: ${insertError.message}`);
+      if (insertError) {
+        throw new Error(`Failed to store document chunks: ${insertError.message}`);
+      }
     }
 
     // ── Step 6: Mark analysis as completed ─────────────────────────────
+    // Evidence status is left alone: reading a file is not verifying it, and
+    // only a person can mark evidence "verified". Unread content is kept in
+    // error_message so the warning stays visible after the toast has gone.
+    const warningText = extraction.warnings?.join(' ') || null;
     await supabase
       .from('document_analysis')
       .update({
         status: 'completed',
         chunk_count: chunks.length,
         page_count: extraction.totalPages,
+        error_message: warningText,
         completed_at: new Date().toISOString(),
       })
       .eq('evidence_id', evidence_id);
-
-    // Update evidence status to verified now that it's been analyzed
-    await supabase
-      .from('evidence')
-      .update({ status: 'verified', verified_by: user.id })
-      .eq('id', evidence_id);
 
     await supabase.from('audit_logs').insert({
       organisation_id: profile.organisation_id,
@@ -203,7 +211,8 @@ export async function POST(req: NextRequest) {
       success: true,
       chunk_count: chunks.length,
       page_count: extraction.totalPages,
-      message: `Document analyzed successfully — ${chunks.length} searchable sections extracted from ${extraction.totalPages} page(s).`,
+      warning: warningText,
+      message: `Document analyzed — ${chunks.length} searchable sections extracted.`,
     });
 
   } catch (err: any) {

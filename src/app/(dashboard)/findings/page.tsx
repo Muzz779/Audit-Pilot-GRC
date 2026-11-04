@@ -37,7 +37,7 @@ export default async function FindingsPage() {
     <div className="flex flex-col">
       <Topbar
         title="Findings"
-        subtitle="Evidence-based compliance findings — Phase 2 preview"
+        subtitle="Evidence-based compliance findings"
       />
       <FindingsContent
         frameworks={frameworks || []}

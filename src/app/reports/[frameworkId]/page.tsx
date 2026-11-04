@@ -118,17 +118,17 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
     new Set(findings.flatMap((f: any) => (f.evidence_chunk_ids || []) as string[]))
   );
 
-  const citationByChunk = new Map<string, { evidenceId: string; page: number | null }>();
+  const citationByChunk = new Map<string, { evidenceId: string; page: number | null; section: string | null }>();
   const evidenceNameById = new Map<string, string>();
 
   if (allChunkIds.length > 0) {
     const { data: chunks } = await supabase
       .from('document_chunks')
-      .select('id, evidence_id, page_number')
+      .select('id, evidence_id, page_number, section_title')
       .in('id', allChunkIds);
 
     for (const ch of (chunks || []) as any[]) {
-      citationByChunk.set(ch.id, { evidenceId: ch.evidence_id, page: ch.page_number });
+      citationByChunk.set(ch.id, { evidenceId: ch.evidence_id, page: ch.page_number, section: ch.section_title });
     }
 
     const evidenceIds = Array.from(new Set((chunks || []).map((c: any) => c.evidence_id).filter(Boolean)));
@@ -144,7 +144,8 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
   // Build a per-finding "Document (p. 3, 5)" citation list, deduped by document.
   function citationsFor(finding: any): string[] {
     const pagesByDoc = new Map<string, Set<number>>();
-    const docsNoPage = new Set<string>();
+    // Word files and spreadsheets have no pages, so they cite a section or row range
+    const sectionsByDoc = new Map<string, Set<string>>();
     for (const chunkId of (finding.evidence_chunk_ids || []) as string[]) {
       const cite = citationByChunk.get(chunkId);
       if (!cite) continue;
@@ -153,7 +154,8 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
         if (!pagesByDoc.has(name)) pagesByDoc.set(name, new Set());
         pagesByDoc.get(name)!.add(cite.page);
       } else {
-        docsNoPage.add(name);
+        if (!sectionsByDoc.has(name)) sectionsByDoc.set(name, new Set());
+        if (cite.section) sectionsByDoc.get(name)!.add(cite.section);
       }
     }
     const out: string[] = [];
@@ -161,7 +163,13 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
       const sorted = Array.from(pages).sort((a, b) => a - b);
       out.push(`${name} (p. ${sorted.join(', ')})`);
     }
-    for (const name of docsNoPage) if (!pagesByDoc.has(name)) out.push(name);
+    for (const [name, sections] of sectionsByDoc) {
+      if (pagesByDoc.has(name)) continue;
+      const listed = Array.from(sections);
+      const shown = listed.slice(0, 4).join('; ');
+      const more = listed.length > 4 ? `; +${listed.length - 4} more` : '';
+      out.push(listed.length > 0 ? `${name} (${shown}${more})` : name);
+    }
     return out;
   }
 
@@ -313,7 +321,11 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
                                 {cites.length > 0 ? (
                                   <span className="text-gray-600">{cites.join('; ')}</span>
                                 ) : (
-                                  <span className="italic text-gray-400">No document evidence cited.</span>
+                                  <span className="italic text-gray-400">
+                                    {(f.evidence_chunk_ids || []).length > 0
+                                      ? 'The cited document has since been deleted or re-analysed. Run this control again to restore its citation.'
+                                      : 'No document evidence cited.'}
+                                  </span>
                                 )}
                               </div>
                               {f.reasoning && (

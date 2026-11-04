@@ -60,8 +60,6 @@ export async function POST(req: NextRequest) {
   try {
     // ── Step 1: Embed the question ───────────────────────────────────
     const queryEmbedding = await embedQuery(question.trim());
-    console.log('Query embedding length:', queryEmbedding.length);
-    console.log('First 5 values:', queryEmbedding.slice(0, 5));
 
     // ── Step 2: Retrieve relevant chunks from BOTH sources in parallel ──
     const [docResults, regResults] = await Promise.all([
@@ -78,11 +76,6 @@ export async function POST(req: NextRequest) {
         match_threshold: SIMILARITY_THRESHOLD,
       }),
     ]);
-
-    console.log('📄 Doc results:', docResults.data?.length || 0, 'chunks');
-    console.log('📋 Reg results:', regResults.data?.length || 0, 'chunks');
-    if (docResults.error) console.error('❌ Doc error:', docResults.error);
-    if (regResults.error) console.error('❌ Reg error:', regResults.error);
 
     if (docResults.error) throw new Error(`Document search failed: ${docResults.error.message}`);
     if (regResults.error) throw new Error(`Regulation search failed: ${regResults.error.message}`);
@@ -153,7 +146,7 @@ REGULATION EXCERPTS:
 ${regulationContext || '(none retrieved)'}`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
       max_tokens: 1500,
       system: systemPrompt,
       messages: [{ role: 'user', content: question.trim() }],

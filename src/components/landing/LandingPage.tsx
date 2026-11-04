@@ -54,8 +54,9 @@ export function LandingPage() {
     { q: 'How does AuditPilot avoid “hallucinated” compliance answers?', a: 'It only answers from evidence it can retrieve from your documents and the regulation base, and it cites the source every time. When the evidence does not cover a requirement, it says so rather than guessing — and every finding is a draft a human must accept.' },
     { q: 'Is the POPIA content legally verified?', a: 'The POPIA knowledge base was drafted from the public text of the Act and is clearly marked as unverified until a qualified practitioner reviews it. AuditPilot shows that notice wherever the regulation is used — we would rather be transparent than overstate.' },
     { q: 'How does PayFast billing work?', a: 'Billing is in ZAR via PayFast — no forex and no overseas cards. Start on the free plan, upgrade when it is proving its worth, and cancel anytime with no lock-in.' },
-    { q: 'Where does my compliance data live?', a: 'Each organisation’s data is encrypted and isolated using row-level security, evidence files are served through short-lived signed links rather than public URLs, and access is controlled per role. Your uploaded documents are used only to generate your findings — we don’t use them to train any AI models, and they’re never shared with other organisations. AI processing runs on Anthropic (Claude) and Voyage AI under their commercial API terms.' },
-    { q: 'Can I import my existing policies and registers?', a: 'Yes — upload your policy and evidence PDFs directly, or start from the built-in policy templates and customise them. Your uploaded documents are what the AI audits against.' },
+    { q: 'Where does my compliance data live?', a: 'Each organisation’s data is encrypted and isolated using row-level security, evidence files are served through short-lived signed links rather than public URLs, and access is controlled per role. Your uploaded documents are used only to generate your findings, AuditPilot does not train AI models on them, and they’re never shared with other organisations. AI processing runs on Anthropic (Claude) and Voyage AI — our Security page explains how each provider handles your text.' },
+    { q: 'Can I import my existing policies and registers?', a: 'Yes — upload PDFs (including scanned ones), Word documents, Excel workbooks or CSV files, or start from the built-in policy templates and customise them. Your uploaded documents are what the AI audits against.' },
+    { q: 'Does it audit general ledgers or financial statements?', a: 'No. AuditPilot is a POPIA compliance tool, not a financial audit or accounting tool. You can upload spreadsheets such as ledger exports as evidence and search them with citations to the exact rows, but it does not total, reconcile or test transactions.' },
   ];
 
   return (
@@ -283,7 +284,7 @@ export function LandingPage() {
               Track eight frameworks. AI-audit POPIA today.
             </h2>
             <p className="text-sm text-ink-500 dark:text-ink-300">
-              We only turn on AI auditing for a framework once its regulation base is built and reviewed — so a finding is never grounded in guesswork.
+              POPIA is the only framework with a regulation base today, and that base is still awaiting legal review. AI findings on any other framework are clearly labelled illustrative, not a compliance assessment.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

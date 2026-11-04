@@ -27,7 +27,11 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - **Private storage bucket**: files are downloaded server-side via service-role client using the stored storage PATH, not fetched via public URL. `file_url` stores the path, not a public URL.
 - **unpdf splits by real page** (`mergePages: false`) — this is what makes citations page-accurate. Critical; don't break it.
 - **Re-analyzing a document must delete old chunks first** or chunks accumulate and eventually blow Voyage's token limit.
-- **Embedding batches** are capped by both input count (128) and total chars (~350k) to stay under Voyage limits.
+- **Embedding batches** are capped by both input count (128) and total chars (~350k) to stay under Voyage limits. Rate limits and outages are retried in `embeddings.ts`, inside the 120s route limit.
+- **The chunker must never drop text.** Heading detection only labels a section. It used to delete heading-like lines, so short real evidence ("Approved by: ...", list items) never reached the AI and could produce false gaps.
+- **Spreadsheets** (XLSX via exceljs, CSV via our own parser) are cited by sheet and row range, Word files by section. `page_number` is null for these: never fake a "Page 1". Old `.xls` and `.doc` get a clear "re-save" error. Do not use the npm `xlsx` package (unpatched CVEs, and we parse customer uploads).
+- **Scanned PDF pages** are read by Claude OCR (`extraction.ts`). Anything unread must surface as a warning, never be dropped quietly. Limit: about 10-15 scanned pages per run (8,000 output tokens), and the remainder is reported as unread.
+- **Re-analyzing or deleting a document replaces its chunks**, so existing findings lose that citation. The UI warns about this and the board report says so.
 - **No new vendors / no scope creep** without flagging it to the human first.
 
 ## What is BUILT and VALIDATED (working, tested on real docs)
@@ -60,8 +64,6 @@ Then run `npm run embed-regulations` once to populate regulation embeddings.
 ## Roadmap — what's LEFT (Phases 4–6 are DONE; remaining below)
 - **⚠️ Framework/regulation coverage gap (LIABILITY — highest open risk):** `compliance_frameworks` seeds 8 frameworks (POPIA, GDPR, ISO 27001, SOC 2, NIS2, PCI-DSS, King IV, NIST CSF), but ONLY POPIA has a regulation knowledge base (`seed_popia_regulations.sql` / `regulation_chunks`). There is currently NO gate stopping a user from running the AI findings engine / Run Full Audit on a non-POPIA framework — the engine finds zero governing regulation, so findings are grounded only in evidence + Claude's general knowledge, NOT cited to any regulation, and because `regulationChunks` is empty `used_unverified_regulation` is `false` so no warning even shows. FIX before launch: gate the findings/audit engine (UI + server) to frameworks that actually have a regulation base (POPIA). See engine `src/lib/findings/engine.ts` (`match_regulation_chunks` by `framework_id`).
 - **Legal review of POPIA seed data** before any live customer — non-negotiable (stays `is_verified: false`, keep unverified warnings).
-- **Scanned-PDF OCR** — currently scanned PDFs are rejected; add OCR via Claude vision.
-- **More file types in analysis** — XLSX ingestion.
 - **More frameworks** (GDPR, ISO 27001, etc.) — GATED on building a regulation base for each AND legal review of it; adding unverified frameworks multiplies liability. Do not do this without the human confirming legal review.
 - **Commit migrations 002/003** (see NOTE above) so a fresh env is reproducible.
 - **Mobile/responsive pass** + set `STARTER_AI_MONTHLY_CAP` to the real number.

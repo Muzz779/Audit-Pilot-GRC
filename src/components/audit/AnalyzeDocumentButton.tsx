@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Loader2, CheckCircle2, AlertCircle, FileSearch } from 'lucide-react';
+import { Sparkles, Loader2, CheckCircle2, AlertCircle, FileSearch, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -42,14 +42,15 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
     return () => { cancelled = true; };
   }, [evidenceId]);
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (reanalyze = false) => {
     setAnalyzing(true);
     setStatus('processing');
+    setErrorMessage(null);
     try {
       const res = await fetch('/api/evidence/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evidence_id: evidenceId }),
+        body: JSON.stringify({ evidence_id: evidenceId, reanalyze }),
       });
       const data = await res.json();
 
@@ -57,7 +58,9 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
 
       setStatus('completed');
       setChunkCount(data.chunk_count);
-      toast.success(data.message || 'Document analyzed successfully');
+      setErrorMessage(data.warning || null);
+      if (data.warning) toast.warning(data.warning);
+      else toast.success(data.message || 'Document analyzed successfully');
       onAnalysisComplete?.();
     } catch (err: any) {
       setStatus('failed');
@@ -84,11 +87,30 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
     );
   }
 
-  if (status === 'completed') {
+  if (status === 'completed' && !analyzing) {
+    const handleReanalyze = () => {
+      const confirmed = window.confirm(
+        'Re-analyze this document? Existing findings that cite it will lose their page or row citation, so run those controls again afterwards.'
+      );
+      if (confirmed) handleAnalyze(true);
+    };
+
     return (
-      <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-        <CheckCircle2 className="w-3 h-3" />
-        Analyzed — {chunkCount} searchable section{chunkCount !== 1 ? 's' : ''}
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="w-3 h-3" />
+          Analyzed — {chunkCount} searchable section{chunkCount !== 1 ? 's' : ''}
+        </div>
+        {errorMessage && (
+          <p className="text-[10px] text-amber-700 dark:text-amber-400 max-w-xs">{errorMessage}</p>
+        )}
+        <button
+          type="button"
+          onClick={handleReanalyze}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+        >
+          <RefreshCw className="w-3 h-3" /> Re-analyze
+        </button>
       </div>
     );
   }
@@ -112,7 +134,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
         {errorMessage && (
           <p className="text-[10px] text-muted-foreground max-w-xs">{errorMessage}</p>
         )}
-        <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleAnalyze}>
+        <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleAnalyze()}>
           <Sparkles className="w-3 h-3" /> Try Again
         </Button>
       </div>
@@ -125,7 +147,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
       variant="outline"
       size="sm"
       className="h-6 text-[10px] px-2"
-      onClick={handleAnalyze}
+      onClick={() => handleAnalyze()}
       loading={analyzing}
     >
       <FileSearch className="w-3 h-3" /> Analyze Document

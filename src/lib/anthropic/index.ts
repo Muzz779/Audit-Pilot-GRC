@@ -4,6 +4,8 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+
 const SYSTEM_CONTEXT = `You are an expert GRC (Governance, Risk & Compliance) consultant for South African and global businesses. 
 You specialize in POPIA, ISO 27001, SOC 2, GDPR, NIS2, King IV, and other frameworks.
 You provide practical, actionable advice tailored to the South African business context.
@@ -20,7 +22,7 @@ export async function draftPolicy(params: {
   orgName: string;
 }): Promise<string> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: MODEL,
     max_tokens: 4000,
     system: SYSTEM_CONTEXT,
     messages: [
@@ -66,7 +68,7 @@ export async function assessRisk(params: {
   frameworks: string[];
 }> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: MODEL,
     max_tokens: 2000,
     system: SYSTEM_CONTEXT,
     messages: [
@@ -116,7 +118,7 @@ export async function chatWithGRC(params: {
 }): Promise<string> {
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL,
       max_tokens: 2000,
       system: `${SYSTEM_CONTEXT}\n\nOrganisation context: ${params.orgContext}\n\nYou are the embedded GRC assistant for this organisation. Help them with compliance questions, risk guidance, policy advice, and regulatory updates. Be conversational but professional.`,
       messages: params.messages,
@@ -153,7 +155,7 @@ export async function scanRegulations(params: {
   summary: string;
 }> {
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: MODEL,
     max_tokens: 3000,
     system: SYSTEM_CONTEXT,
     messages: [

@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default function SecurityPage() {
-  const updated = '24 October 2026';
+  const updated = '4 November 2026';
 
   return (
     <main className="min-h-screen bg-white dark:bg-ink-950 text-ink-900 dark:text-ink-50">
@@ -41,9 +41,9 @@ export default function SecurityPage() {
         <Item icon={Database} title="Where your data lives">
           Your documents, findings and records are stored in a managed PostgreSQL database and private file
           storage, hosted on <strong>Supabase</strong> infrastructure in the <strong>European Union</strong>.
-          Each customer organisation is a separate, isolated workspace. We are a South African product and
-          handle POPIA cross-border transfer obligations accordingly; if your organisation requires data to
-          remain in South Africa, talk to us.
+          Each customer organisation is a separate, isolated workspace. Because this hosting is outside South
+          Africa, POPIA&rsquo;s cross-border transfer requirements apply to personal information you upload.
+          If your organisation requires data to remain in South Africa, talk to us.
         </Item>
 
         <Item icon={Lock} title="Isolation, access &amp; encryption">
@@ -58,10 +58,12 @@ export default function SecurityPage() {
         <Item icon={Bot} title="AI processing &amp; sub-processors">
           To read your documents and draft findings, AuditPilot sends the relevant text to two AI
           sub-processors: <strong>Anthropic (Claude)</strong> for analysis and drafting, and{' '}
-          <strong>Voyage AI</strong> for the search embeddings that make citations page-accurate. Your text is
-          sent only to produce your results. <strong>We do not use your documents to train any AI models</strong>,
-          and your data is never shared with other organisations. These providers process data under their own
-          commercial API terms, which we review as part of our sub-processor due diligence.
+          <strong>Voyage AI</strong> for the search embeddings that make citations accurate. Your text is sent
+          only to produce your results, <strong>AuditPilot does not train AI models on your documents</strong>,
+          and your data is never shared with other organisations. Each provider handles what it receives under
+          its own terms. Voyage AI&rsquo;s standard terms allow it to use submitted text to improve its models
+          unless an account opts out, and we have not yet completed that opt-out. Until we update this page,
+          please don&rsquo;t upload real client or personal data: use sample or non-sensitive documents.
         </Item>
 
         <Item icon={FileWarning} title="The regulation base is unverified — on purpose">
@@ -73,10 +75,10 @@ export default function SecurityPage() {
         </Item>
 
         <Item icon={Trash2} title="Your data is yours">
-          You can delete individual documents or your whole workspace at any time. When you delete a document,
-          its stored file and the derived search data are removed. If you close your account, we delete your
-          organisation&rsquo;s data within [30 days], except where we are legally required to retain something.
-          You can request an export of your data by contacting us.
+          You can delete any document from your evidence repository at any time, which removes its stored file
+          and derived search data. To close your account and delete your whole workspace, or to request an
+          export of your data, contact us and we&rsquo;ll do it for you, except where we are legally required
+          to retain something.
         </Item>
 
         <Item icon={BadgeCheck} title="What we don&rsquo;t claim">

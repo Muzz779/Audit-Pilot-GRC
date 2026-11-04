@@ -49,7 +49,7 @@ export const PRICING_PLANS = {
       'Priority support',
       'PayFast recurring billing',
     ],
-    cta: 'Start Pro Trial',
+    cta: 'Get Pro',
     highlighted: true,
     payfast_amount: '799.00',
   },

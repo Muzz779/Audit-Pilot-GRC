@@ -14,9 +14,59 @@
 const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'voyage-3-lite'; // 1536 dimensions, cost-efficient, good for retrieval
 
+// How long one embedding request may wait out rate limits. Keeps a
+// document analysis inside the route's 120s limit, so it fails with a
+// clear message instead of being killed mid-way.
+const MAX_RETRY_WAIT_MS = 75_000;
+
 interface VoyageEmbeddingResponse {
   data: Array<{ embedding: number[]; index: number }>;
   usage: { total_tokens: number };
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * POST to Voyage, waiting out rate limits and brief outages. The rate limit
+ * resets within a minute, so ordinary use recovers without the user seeing it.
+ */
+async function postToVoyage(apiKey: string, payload: Record<string, unknown>): Promise<VoyageEmbeddingResponse> {
+  const startedAt = Date.now();
+  let attempt = 0;
+
+  while (true) {
+    const response = await fetch(VOYAGE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) return response.json();
+
+    const retryable = response.status === 429 || response.status >= 500;
+    const errorText = await response.text();
+
+    const retryAfterSeconds = Number(response.headers.get('retry-after'));
+    const waitMs = retryAfterSeconds > 0
+      ? retryAfterSeconds * 1000
+      : Math.min(5_000 * 2 ** attempt, 30_000);
+
+    if (!retryable || Date.now() - startedAt + waitMs > MAX_RETRY_WAIT_MS) {
+      if (response.status === 429) {
+        throw new Error(
+          'The document search service is at its rate limit right now. Please wait a minute and try again. ' +
+          'Very large documents may need to be split into smaller files.'
+        );
+      }
+      throw new Error(`Voyage embedding API error (${response.status}): ${errorText}`);
+    }
+
+    await sleep(waitMs);
+    attempt++;
+  }
 }
 
 /**
@@ -69,10 +119,12 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
       const part = text.slice(start, sliceEnd || end).trim();
       if (part.length > 0) parts.push(part);
 
-      // advance with overlap
-      start = (sliceEnd || end) - PART_OVERLAP_CHARS;
-      if (start < 0) start = 0;
-      if (start >= text.length) break;
+      // Reached the end of the text. Without this stop, the overlap step
+      // below moves `start` back and the loop never finishes.
+      if ((sliceEnd || end) >= text.length) break;
+
+      // advance with overlap, always moving forward
+      start = Math.max((sliceEnd || end) - PART_OVERLAP_CHARS, start + 1);
     }
 
     return parts.length > 0 ? parts : [text.slice(0, maxChars)];
@@ -105,25 +157,11 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
       cursor++;
     }
 
-    const response = await fetch(VOYAGE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        input: batchInputs,
-        model: EMBEDDING_MODEL,
-        input_type: 'document',
-      }),
+    const data = await postToVoyage(apiKey, {
+      input: batchInputs,
+      model: EMBEDDING_MODEL,
+      input_type: 'document',
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Voyage embedding API error (${response.status}): ${errorText}`);
-    }
-
-    const data: VoyageEmbeddingResponse = await response.json();
     const sorted = data.data.sort((a, b) => a.index - b.index);
     allEmbeddings.push(...sorted.map(d => d.embedding));
   }
@@ -158,24 +196,10 @@ export async function embedQuery(query: string): Promise<number[]> {
     throw new Error('VOYAGE_API_KEY is not configured.');
   }
 
-  const response = await fetch(VOYAGE_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      input: [query],
-      model: EMBEDDING_MODEL,
-      input_type: 'query',
-    }),
+  const data = await postToVoyage(apiKey, {
+    input: [query],
+    model: EMBEDDING_MODEL,
+    input_type: 'query',
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Voyage embedding API error (${response.status}): ${errorText}`);
-  }
-
-  const data: VoyageEmbeddingResponse = await response.json();
   return data.data[0].embedding;
 }
