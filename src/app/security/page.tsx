@@ -40,10 +40,12 @@ export default function SecurityPage() {
 
         <Item icon={Database} title="Where your data lives">
           Your documents, findings and records are stored in a managed PostgreSQL database and private file
-          storage, hosted on <strong>Supabase</strong> infrastructure in the <strong>European Union</strong>.
-          Each customer organisation is a separate, isolated workspace. Because this hosting is outside South
-          Africa, POPIA&rsquo;s cross-border transfer requirements apply to personal information you upload.
-          If your organisation requires data to remain in South Africa, talk to us.
+          storage, hosted on <strong>Supabase</strong> infrastructure in <strong>Frankfurt, Germany</strong>,
+          and the application itself runs in the same city. Each customer organisation is a separate, isolated
+          workspace. Because this hosting is outside South Africa, POPIA&rsquo;s cross-border transfer
+          requirements apply to personal information you upload. AuditPilot can&rsquo;t currently keep your data
+          inside South Africa: our database provider has no South African region, and the AI providers below
+          process text outside the country.
         </Item>
 
         <Item icon={Lock} title="Isolation, access &amp; encryption">

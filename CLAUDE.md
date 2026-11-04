@@ -18,7 +18,8 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - Voyage AI (`voyage-3-lite`, 1536 dims) for embeddings — separate API key `VOYAGE_API_KEY`
 - unpdf (PDF.js engine) for PDF text extraction — REPLACED pdf-parse, which failed on valid PDFs with "bad xref entry". Do not reintroduce pdf-parse.
 - PayFast (ZAR) for billing, sandbox mode currently
-- Vercel for deployment
+- Vercel for deployment — functions pinned to Frankfurt (`"regions": ["fra1"]` in `vercel.json`), next to the Supabase database. Check the `X-Vercel-Id` header if this ever matters.
+- **Where data goes:** database, files and server code are in Frankfurt. Supabase has no South African region, and document text also goes to Anthropic and Voyage, so data can't be kept inside South Africa. The Security page says this; keep it accurate.
 - Repo: github.com/Muzz779/Audit-Pilot-GRC (branch: main)
 
 ## Hard-won gotchas (these cost real debugging time — respect them)
@@ -69,7 +70,8 @@ Then run `npm run embed-regulations` once to populate regulation embeddings.
 - Analyze: `src/app/api/evidence/analyze/route.ts`
 
 ## Roadmap — what's LEFT (Phases 4–6 are DONE; remaining below)
-- **⚠️ Run migration 004 on live (CRITICAL, check whether done).** Before it, any signed-in user can list other organisations' evidence files and change their own organisation, role and platform-admin flag.
+- **Migration 004 is live** (run and verified 2026-11-04 with a normal signed-in account). `supabase/migration_004_rollback.sql` restores the previous rules if it ever has to be undone, which reopens the holes.
+- **Open rule to tighten:** the live `organisations` table has two INSERT rules with `with_check true`, and "Users can create organisations" includes `anon`. Nobody can read or join through them, but anyone can add empty rows. Migration 004 doesn't touch them. Check signup still works before removing `anon`.
 - **⚠️ Framework/regulation coverage gap (LIABILITY — highest open risk):** `compliance_frameworks` seeds 8 frameworks (POPIA, GDPR, ISO 27001, SOC 2, NIS2, PCI-DSS, King IV, NIST CSF), but ONLY POPIA has a regulation knowledge base (`seed_popia_regulations.sql` / `regulation_chunks`). There is currently NO gate stopping a user from running the AI findings engine / Run Full Audit on a non-POPIA framework — the engine finds zero governing regulation, so findings are grounded only in evidence + Claude's general knowledge, NOT cited to any regulation, and because `regulationChunks` is empty `used_unverified_regulation` is `false` so no warning even shows. FIX before launch: gate the findings/audit engine (UI + server) to frameworks that actually have a regulation base (POPIA). See engine `src/lib/findings/engine.ts` (`match_regulation_chunks` by `framework_id`).
 - **Legal review of POPIA seed data** before any live customer — non-negotiable (stays `is_verified: false`, keep unverified warnings).
 - **More frameworks** (GDPR, ISO 27001, etc.) — GATED on building a regulation base for each AND legal review of it; adding unverified frameworks multiplies liability. Do not do this without the human confirming legal review.
