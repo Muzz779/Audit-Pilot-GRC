@@ -48,7 +48,10 @@ export function ComplianceContent({
   const canEdit = ['owner', 'admin', 'member'].includes(userRole);
 
   const selectedOrgFW = orgFrameworks.find(f => f.framework_id === selectedFrameworkId);
-  const frameworkControls = controls.filter(c => c.framework_id === selectedFrameworkId);
+  // Number-aware, or POPIA-10 sorts before POPIA-2 and the list jumps when a status changes
+  const frameworkControls = controls
+    .filter(c => c.framework_id === selectedFrameworkId)
+    .sort((a: any, b: any) => a.control_id.localeCompare(b.control_id, undefined, { numeric: true }));
 
   const unaddedFrameworks = allFrameworks.filter(
     f => !orgFrameworks.some(of => of.framework_id === f.id)

@@ -21,21 +21,24 @@ export async function POST(req: NextRequest) {
   const { email, role, full_name } = body;
   if (!email?.trim()) return NextResponse.json({ error: 'Email is required' }, { status: 400 });
 
+  const invitedRole = role || 'member';
+  if (!['admin', 'member', 'auditor'].includes(invitedRole)) {
+    return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+  }
+
   const orgName = (profile as any).organisations?.name || 'your organisation';
 
   // Use service role client — admin.inviteUserByEmail requires service role
   const adminClient = await createServiceRoleClient();
 
-  const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+  const { data: invited, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email.trim().toLowerCase(),
     {
       data: {
         full_name: full_name?.trim() || '',
-        organisation_id: profile.organisation_id,
-        invited_role: role || 'member',
         invited_by: user.id,
       },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/register?invited=true&org=${profile.organisation_id}`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/register?invited=true`,
     }
   );
 
@@ -47,6 +50,23 @@ export async function POST(req: NextRequest) {
     }
     console.error('Invite error:', inviteError);
     return NextResponse.json({ error: inviteError.message }, { status: 500 });
+  }
+
+  // Joining happens here on the server, because the browser can't be trusted
+  // to say which organisation an account belongs to. The signup trigger has
+  // already created the profile row.
+  const { error: linkError } = await adminClient
+    .from('profiles')
+    .update({
+      organisation_id: profile.organisation_id,
+      role: invitedRole,
+      onboarding_completed: true,
+    })
+    .eq('id', invited.user.id);
+
+  if (linkError) {
+    console.error('Invite link error:', linkError);
+    return NextResponse.json({ error: 'The invitation was sent but the account could not be linked. Please contact support.' }, { status: 500 });
   }
 
   await supabase.from('audit_logs').insert({

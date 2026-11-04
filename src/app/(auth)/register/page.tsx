@@ -16,7 +16,6 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isInvited = searchParams.get('invited') === 'true';
-  const invitedOrgId = searchParams.get('org');
 
   const [step, setStep] = useState<Step>('account');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,6 +37,31 @@ function RegisterForm() {
     }
     setLoading(true);
     try {
+      // The invite already created this account and linked it to the
+      // organisation on the server. Accepting only sets the password.
+      if (isInvited) {
+        const { data: { user: invitedUser } } = await supabase.auth.getUser();
+        if (!invitedUser) {
+          toast.error('Open this page from your invitation email, or use Forgot Password with the invited address.');
+          return;
+        }
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: accountForm.password,
+          data: { full_name: accountForm.full_name },
+        });
+        if (passwordError) throw passwordError;
+
+        await supabase
+          .from('profiles')
+          .update({ full_name: accountForm.full_name.trim() })
+          .eq('id', invitedUser.id);
+
+        toast.success('Account ready. You have been added to your organisation.');
+        router.push('/dashboard');
+        router.refresh();
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: accountForm.email,
         password: accountForm.password,
@@ -57,25 +81,6 @@ function RegisterForm() {
         .from('profiles')
         .update({ full_name: accountForm.full_name.trim() })
         .eq('id', newUserId);
-
-      // If this is an invited user — link them to the org directly
-      if (isInvited && invitedOrgId) {
-        const invitedRole = data.user.user_metadata?.invited_role || 'member';
-        await supabase
-          .from('profiles')
-          .update({
-            organisation_id: invitedOrgId,
-            role: invitedRole,
-            full_name: accountForm.full_name.trim(),
-            onboarding_completed: true,
-          })
-          .eq('id', newUserId);
-
-        toast.success('Account created! You have been added to your organisation.');
-        router.push('/dashboard');
-        router.refresh();
-        return;
-      }
 
       // Normal signup — go to org step
       setStep('organisation');
@@ -102,19 +107,20 @@ function RegisterForm() {
 
       const slug = `${generateSlug(orgForm.name)}-${Date.now()}`;
 
-      // Create organisation
-      const { data: org, error: orgError } = await supabase
+      // Create organisation. The id is made here because the user can't read
+      // the row back until the profile below links them to it.
+      const organisationId = crypto.randomUUID();
+      const { error: orgError } = await supabase
         .from('organisations')
         .insert({
+          id: organisationId,
           name: orgForm.name.trim(),
           slug,
           industry: orgForm.industry || null,
           size: orgForm.size || null,
           country: 'ZA',
           timezone: 'Africa/Johannesburg',
-        })
-        .select()
-        .single();
+        });
 
       if (orgError) throw orgError;
 
@@ -122,7 +128,7 @@ function RegisterForm() {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          organisation_id: org.id,
+          organisation_id: organisationId,
           role: 'owner',
           onboarding_completed: true,
         })
@@ -132,7 +138,7 @@ function RegisterForm() {
 
       // Create starter subscription
       await supabase.from('subscriptions').insert({
-        organisation_id: org.id,
+        organisation_id: organisationId,
         tier: 'starter',
         status: 'active',
         amount_cents: 0,
@@ -141,7 +147,7 @@ function RegisterForm() {
 
       // Welcome notification
       await supabase.from('notifications').insert({
-        organisation_id: org.id,
+        organisation_id: organisationId,
         user_id: uid,
         type: 'system',
         title: 'Welcome to AuditPilot! 🎉',
