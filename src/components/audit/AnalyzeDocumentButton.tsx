@@ -52,7 +52,10 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ evidence_id: evidenceId, reanalyze }),
       });
-      const data = await res.json();
+      // A platform timeout returns an HTML page, not JSON
+      const data = await res.json().catch(() => ({
+        error: 'Analysis timed out. Please try again, or split the file into smaller parts.',
+      }));
 
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
 

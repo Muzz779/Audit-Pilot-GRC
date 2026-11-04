@@ -14,10 +14,12 @@
 const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'voyage-3-lite'; // 1536 dimensions, cost-efficient, good for retrieval
 
-// How long one embedding request may wait out rate limits. Keeps a
-// document analysis inside the route's 120s limit, so it fails with a
-// clear message instead of being killed mid-way.
-const MAX_RETRY_WAIT_MS = 75_000;
+// How long a whole document may spend embedding, rate-limit waits included.
+// Keeps analysis inside the route's 120s limit, so it fails with a clear
+// message instead of being killed mid-way.
+const DOCUMENT_DEADLINE_MS = 100_000;
+// A search query is one short call, so it waits less
+const QUERY_DEADLINE_MS = 25_000;
 
 interface VoyageEmbeddingResponse {
   data: Array<{ embedding: number[]; index: number }>;
@@ -30,8 +32,11 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * POST to Voyage, waiting out rate limits and brief outages. The rate limit
  * resets within a minute, so ordinary use recovers without the user seeing it.
  */
-async function postToVoyage(apiKey: string, payload: Record<string, unknown>): Promise<VoyageEmbeddingResponse> {
-  const startedAt = Date.now();
+async function postToVoyage(
+  apiKey: string,
+  payload: Record<string, unknown>,
+  deadlineAt: number
+): Promise<VoyageEmbeddingResponse> {
   let attempt = 0;
 
   while (true) {
@@ -54,7 +59,7 @@ async function postToVoyage(apiKey: string, payload: Record<string, unknown>): P
       ? retryAfterSeconds * 1000
       : Math.min(5_000 * 2 ** attempt, 30_000);
 
-    if (!retryable || Date.now() - startedAt + waitMs > MAX_RETRY_WAIT_MS) {
+    if (!retryable || Date.now() + waitMs > deadlineAt) {
       if (response.status === 429) {
         throw new Error(
           'The document search service is at its rate limit right now. Please wait a minute and try again. ' +
@@ -95,7 +100,11 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
   // Provider limits (conservative defaults)
   const MAX_INPUT_TOKENS = 3000; // per single text input — split if larger
-  const MAX_BATCH_TOKENS = 32000; // total tokens per API call
+  // Total estimated tokens per API call. A request larger than the account's
+  // tokens-per-minute limit can never succeed, however long it retries, and
+  // the entry limit is 10K. Numbers tokenise worse than this 4-chars estimate,
+  // so spreadsheet batches run larger than they look: stay well under.
+  const MAX_BATCH_TOKENS = 6000;
   const MAX_BATCH_INPUTS = 128; // Voyage documented per-request input limit
   const PART_OVERLAP_CHARS = 200; // overlap when splitting oversized texts
 
@@ -140,6 +149,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   }
 
   const allEmbeddings: number[][] = [];
+  const deadlineAt = Date.now() + DOCUMENT_DEADLINE_MS;
 
   // Batch by both input count and estimated token sum
   let cursor = 0;
@@ -161,7 +171,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
       input: batchInputs,
       model: EMBEDDING_MODEL,
       input_type: 'document',
-    });
+    }, deadlineAt);
     const sorted = data.data.sort((a, b) => a.index - b.index);
     allEmbeddings.push(...sorted.map(d => d.embedding));
   }
@@ -200,6 +210,6 @@ export async function embedQuery(query: string): Promise<number[]> {
     input: [query],
     model: EMBEDDING_MODEL,
     input_type: 'query',
-  });
+  }, Date.now() + QUERY_DEADLINE_MS);
   return data.data[0].embedding;
 }

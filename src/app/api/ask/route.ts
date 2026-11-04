@@ -6,6 +6,8 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+export const maxDuration = 60; // covers a rate-limit wait plus the Claude call
+
 const SIMILARITY_THRESHOLD = 0.25;
 const MAX_DOCUMENT_CHUNKS = 8;
 const MAX_REGULATION_CHUNKS = 5;
