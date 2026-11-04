@@ -15,9 +15,8 @@ const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'voyage-3-lite'; // 1536 dimensions, cost-efficient, good for retrieval
 
 // How long one analysis step may spend embedding, rate-limit waits included.
-// The live platform cut steps off at about 60s whatever maxDuration says, and
-// a killed step loses its work, so a step gives up well before that. The
-// browser waits and sends the next step, which is what gets past a rate limit.
+// A step killed by the route limit loses its work, so it gives up well before
+// that. The browser waits and sends the next step, which gets past a rate limit.
 const DOCUMENT_DEADLINE_MS = 30_000;
 // A search query is one short call, so it waits less
 const QUERY_DEADLINE_MS = 25_000;

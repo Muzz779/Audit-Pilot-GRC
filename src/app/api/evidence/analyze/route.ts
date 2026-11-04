@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { extractDocument } from '@/lib/rag/extraction';
+import { extractDocument, type ExtractionResult } from '@/lib/rag/extraction';
 import { chunkDocument } from '@/lib/rag/chunking';
 import { embedWithinBudget } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
-export const maxDuration = 60; // one step of an analysis, see STEP_BUDGET_MS
+export const maxDuration = 120; // covers a scanned PDF read, which is the longest step
 
 // Every step refreshes requested_at, so this only passes once steps have stopped
 const STALE_ANALYSIS_MS = 2 * 60 * 1000;
@@ -128,11 +128,24 @@ export async function POST(req: NextRequest) {
     const fileBuffer = Buffer.from(await fileData.arrayBuffer());
 
     // ── Step 2: Extract text with page-level structure ───────────────
-    const extraction = await extractDocument(
-      fileBuffer,
-      evidence.file_type || '',
-      evidence.file_name || evidence.name
-    );
+    // A scanned reading is slow, paid for, and can differ between reads, so
+    // it is kept in storage beside the file for the steps that follow.
+    const ocrCachePath = `${storagePath}.ocr.json`;
+    let extraction: ExtractionResult | null = null;
+
+    if (resume) {
+      const { data: cached } = await serviceClient.storage.from('evidence').download(ocrCachePath);
+      if (cached) extraction = JSON.parse(await cached.text());
+    }
+
+    const resumedScan = extraction !== null;
+    if (!extraction) {
+      extraction = await extractDocument(
+        fileBuffer,
+        evidence.file_type || '',
+        evidence.file_name || evidence.name
+      );
+    }
 
     if (extraction.pages.length === 0) {
       throw new Error('No text could be extracted from this document.');
@@ -145,11 +158,23 @@ export async function POST(req: NextRequest) {
       throw new Error('Document text could not be split into analyzable chunks.');
     }
 
+    const usedOcr = extraction.pages.some(page => page.extractionMethod === 'ocr');
+    const readScanNow = usedOcr && !resumedScan;
+
+    let scanSaved = false;
+    if (readScanNow) {
+      const { error: cacheError } = await serviceClient.storage
+        .from('evidence')
+        // text/plain, because the bucket's allowed types exclude application/json
+        .upload(ocrCachePath, JSON.stringify(extraction), { contentType: 'text/plain', upsert: true });
+      if (cacheError) console.error('Could not keep the scanned reading:', cacheError.message);
+      scanSaved = !cacheError;
+    }
+
     // ── Step 4: Work out where this analysis has got to ───────────────
     // A fresh re-analysis starts clean. Otherwise, chunks already saved by an
-    // earlier step are kept. OCR text can differ between reads, so a run that
-    // used OCR always starts clean rather than mixing two readings.
-    const usedOcr = extraction.pages.some(page => page.extractionMethod === 'ocr');
+    // earlier step are kept. A new scanned reading also starts clean rather
+    // than mixing two readings of the same pages.
     const deleteExistingChunks = async () => {
       const { error: deleteError } = await serviceClient
         .from('document_chunks')
@@ -161,7 +186,7 @@ export async function POST(req: NextRequest) {
     };
 
     let alreadySaved = 0;
-    if ((reanalyze && !resume) || usedOcr) {
+    if ((reanalyze && !resume) || readScanNow) {
       await deleteExistingChunks();
     } else {
       const { data: lastChunk } = await serviceClient
@@ -179,6 +204,11 @@ export async function POST(req: NextRequest) {
         await deleteExistingChunks();
         alreadySaved = 0;
       }
+    }
+
+    // The scan may have used most of this step's time. Embed in the next one.
+    if (scanSaved) {
+      return NextResponse.json({ continue: true, processed: 0, total: chunks.length });
     }
 
     // ── Step 5: Embed and save the next group of chunks ───────────────
@@ -211,10 +241,10 @@ export async function POST(req: NextRequest) {
 
     const savedSoFar = alreadySaved + chunkRows.length;
     if (savedSoFar < chunks.length) {
-      if (usedOcr) {
-        throw new Error(
-          'This scanned document is too large to finish in one pass right now. Please split it into smaller parts.'
-        );
+      // Without a kept reading, the next step would read the scan again and
+      // start over, so it could never finish.
+      if (readScanNow) {
+        throw new Error('This scanned document could not be finished. Please Try Again in a minute.');
       }
       return NextResponse.json({
         continue: true,
@@ -223,6 +253,8 @@ export async function POST(req: NextRequest) {
         rate_limited: rateLimited,
       });
     }
+
+    if (usedOcr) await serviceClient.storage.from('evidence').remove([ocrCachePath]);
 
     // ── Step 6: Mark analysis as completed ─────────────────────────────
     // Evidence status is left alone: reading a file is not verifying it, and

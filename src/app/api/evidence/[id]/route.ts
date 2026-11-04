@@ -45,7 +45,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       ? evidence.file_url.split('/evidence/')[1]
       : evidence.file_url;
 
-    const { error: storageError } = await serviceClient.storage.from('evidence').remove([storagePath]);
+    // The second path is a scanned reading left by an unfinished analysis
+    const { error: storageError } = await serviceClient.storage
+      .from('evidence')
+      .remove([storagePath, `${storagePath}.ocr.json`]);
     if (storageError) {
       return NextResponse.json(
         { error: `The stored file could not be deleted: ${storageError.message}` },
