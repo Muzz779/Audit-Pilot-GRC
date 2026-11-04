@@ -14,12 +14,28 @@
 const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 const EMBEDDING_MODEL = 'voyage-3-lite'; // 1536 dimensions, cost-efficient, good for retrieval
 
-// How long a whole document may spend embedding, rate-limit waits included.
-// Keeps analysis inside the route's 120s limit, so it fails with a clear
+// How long one analysis step may spend embedding, rate-limit waits included.
+// Keeps a step inside the route's 120s limit, so it fails with a clear
 // message instead of being killed mid-way.
 const DOCUMENT_DEADLINE_MS = 100_000;
 // A search query is one short call, so it waits less
 const QUERY_DEADLINE_MS = 25_000;
+
+// Provider limits (conservative defaults)
+const MAX_INPUT_TOKENS = 3000; // per single text input — split if larger
+const MAX_BATCH_INPUTS = 128; // Voyage documented per-request input limit
+const PART_OVERLAP_CHARS = 200; // overlap when splitting oversized texts
+// Estimated tokens per API call. A request larger than the account's
+// tokens-per-minute limit can never succeed, however long it retries, and the
+// entry limit is 10K. Batches also have to fit several to the minute.
+const MAX_BATCH_TOKENS = 4500;
+
+// Prose runs at about 4 characters per token, but spreadsheet rows measured
+// about 2, because digits and punctuation tokenise far worse than words.
+function estimateTokens(text: string): number {
+  const nonLetters = text.replace(/[A-Za-z\s]/g, '').length;
+  return Math.max(1, Math.ceil(text.length / 4 + nonLetters / 2.2));
+}
 
 interface VoyageEmbeddingResponse {
   data: Array<{ embedding: number[]; index: number }>;
@@ -86,27 +102,16 @@ export async function embedText(text: string): Promise<number[]> {
  * Generate embedding vectors for multiple texts in one API call (more efficient).
  * Voyage supports batching up to 128 texts per call.
  */
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  deadlineAt: number = Date.now() + DOCUMENT_DEADLINE_MS
+): Promise<number[][]> {
   if (texts.length === 0) return [];
 
   const apiKey = process.env.VOYAGE_API_KEY;
   if (!apiKey) {
     throw new Error('VOYAGE_API_KEY is not configured. Add it to your environment variables.');
   }
-
-  // Robust token-aware batching and per-input cap
-  // Heuristics: estimate tokens by characters (approx 4 chars/token)
-  const estimateTokens = (s: string) => Math.max(1, Math.ceil(s.length / 4));
-
-  // Provider limits (conservative defaults)
-  const MAX_INPUT_TOKENS = 3000; // per single text input — split if larger
-  // Total estimated tokens per API call. A request larger than the account's
-  // tokens-per-minute limit can never succeed, however long it retries, and
-  // the entry limit is 10K. Numbers tokenise worse than this 4-chars estimate,
-  // so spreadsheet batches run larger than they look: stay well under.
-  const MAX_BATCH_TOKENS = 6000;
-  const MAX_BATCH_INPUTS = 128; // Voyage documented per-request input limit
-  const PART_OVERLAP_CHARS = 200; // overlap when splitting oversized texts
 
   // Split a single large text into smaller parts that respect MAX_INPUT_TOKENS
   function splitTextIntoParts(text: string): string[] {
@@ -149,7 +154,6 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   }
 
   const allEmbeddings: number[][] = [];
-  const deadlineAt = Date.now() + DOCUMENT_DEADLINE_MS;
 
   // Batch by both input count and estimated token sum
   let cursor = 0;
@@ -194,6 +198,38 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   });
 
   return averaged;
+}
+
+/**
+ * Embed as many leading texts as possible in one analysis step, and return
+ * their vectors. The caller saves them and comes back for the rest, so a file
+ * of any size finishes at whatever speed the Voyage plan allows.
+ */
+export async function embedWithinBudget(texts: string[], budgetMs: number): Promise<number[][]> {
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + DOCUMENT_DEADLINE_MS;
+  const embedded: number[][] = [];
+
+  while (embedded.length < texts.length && (embedded.length === 0 || Date.now() - startedAt < budgetMs)) {
+    const group: string[] = [];
+    let groupTokens = 0;
+    for (let i = embedded.length; i < texts.length && group.length < MAX_BATCH_INPUTS; i++) {
+      const tokens = estimateTokens(texts[i]);
+      if (group.length > 0 && groupTokens + tokens > MAX_BATCH_TOKENS) break;
+      group.push(texts[i]);
+      groupTokens += tokens;
+    }
+
+    try {
+      embedded.push(...await embedTexts(group, deadlineAt));
+    } catch (err) {
+      // Keep what this step finished. The next step picks up from there.
+      if (embedded.length > 0) break;
+      throw err;
+    }
+  }
+
+  return embedded;
 }
 
 /**

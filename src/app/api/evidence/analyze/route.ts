@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { extractDocument } from '@/lib/rag/extraction';
 import { chunkDocument } from '@/lib/rag/chunking';
-import { embedTexts } from '@/lib/rag/embeddings';
+import { embedWithinBudget } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
-export const maxDuration = 120; // this can take a while for larger documents
+export const maxDuration = 120; // one step of an analysis, see STEP_BUDGET_MS
 
 const STALE_ANALYSIS_MS = 5 * 60 * 1000;
 const CHUNK_INSERT_BATCH = 200; // keeps each insert under the database request size limit
+// Analysis runs in steps, like Run Full Audit: each request embeds what it can
+// in this time and saves it, then the browser asks for the next step. Large
+// files therefore can't hit the route limit, and an interrupted run resumes.
+const STEP_BUDGET_MS = 20_000;
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
   if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
-  const { evidence_id, reanalyze } = body;
+  const { evidence_id, reanalyze, resume } = body;
 
   if (!evidence_id) {
     return NextResponse.json({ error: 'evidence_id is required' }, { status: 400 });
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
     .eq('evidence_id', evidence_id)
     .maybeSingle();
 
-  if (existingAnalysis?.status === 'completed' && !reanalyze) {
+  if (existingAnalysis?.status === 'completed' && !reanalyze && !resume) {
     return NextResponse.json({
       error: 'This document has already been analyzed. Use Re-analyze to run it again.',
     }, { status: 400 });
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
   // old "processing" row is dead. Without this, the document stays stuck forever.
   const startedAt = existingAnalysis?.requested_at ? new Date(existingAnalysis.requested_at).getTime() : 0;
   const stillRunning = Date.now() - startedAt < STALE_ANALYSIS_MS;
-  if (existingAnalysis?.status === 'processing' && stillRunning) {
+  if (existingAnalysis?.status === 'processing' && stillRunning && !resume) {
     return NextResponse.json({ error: 'Analysis is already in progress for this document.' }, { status: 400 });
   }
 
@@ -140,13 +144,49 @@ export async function POST(req: NextRequest) {
       throw new Error('Document text could not be split into analyzable chunks.');
     }
 
-    // ── Step 4: Generate embeddings for all chunks ────────────────────
-    const embeddings = await embedTexts(chunks.map(c => c.text));
+    // ── Step 4: Work out where this analysis has got to ───────────────
+    // A fresh re-analysis starts clean. Otherwise, chunks already saved by an
+    // earlier step are kept. OCR text can differ between reads, so a run that
+    // used OCR always starts clean rather than mixing two readings.
+    const usedOcr = extraction.pages.some(page => page.extractionMethod === 'ocr');
+    const deleteExistingChunks = async () => {
+      const { error: deleteError } = await serviceClient
+        .from('document_chunks')
+        .delete()
+        .eq('evidence_id', evidence_id);
+      if (deleteError) {
+        throw new Error(`Failed to remove existing document chunks: ${deleteError.message}`);
+      }
+    };
 
-    // ── Step 5: Store chunks + embeddings in the database ─────────────
-    // Use the same service role client for the bulk insert to avoid RLS
+    let alreadySaved = 0;
+    if ((reanalyze && !resume) || usedOcr) {
+      await deleteExistingChunks();
+    } else {
+      const { data: lastChunk } = await serviceClient
+        .from('document_chunks')
+        .select('chunk_index')
+        .eq('evidence_id', evidence_id)
+        .order('chunk_index', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      alreadySaved = lastChunk ? lastChunk.chunk_index + 1 : 0;
+
+      // More chunks than this reading produces means they came from an older
+      // chunker, so they can't be continued from.
+      if (alreadySaved > chunks.length) {
+        await deleteExistingChunks();
+        alreadySaved = 0;
+      }
+    }
+
+    // ── Step 5: Embed and save the next group of chunks ───────────────
+    const remaining = chunks.slice(alreadySaved);
+    const embeddings = await embedWithinBudget(remaining.map(c => c.text), STEP_BUDGET_MS);
+
+    // Use the service role client for the bulk insert to avoid RLS
     // overhead on a potentially large batch.
-    const chunkRows = chunks.map((chunk: any, i: number) => ({
+    const chunkRows = remaining.slice(0, embeddings.length).map((chunk: any, i: number) => ({
       organisation_id: profile.organisation_id,
       evidence_id,
       chunk_text: chunk.text,
@@ -158,17 +198,6 @@ export async function POST(req: NextRequest) {
       token_count: chunk.estimatedTokens,
     }));
 
-    // Clean up any existing chunks for this evidence before inserting new ones
-    // This ensures re-runs replace old chunks instead of creating duplicates.
-    const { error: deleteError } = await serviceClient
-      .from('document_chunks')
-      .delete()
-      .eq('evidence_id', evidence_id);
-
-    if (deleteError) {
-      throw new Error(`Failed to remove existing document chunks: ${deleteError.message}`);
-    }
-
     for (let i = 0; i < chunkRows.length; i += CHUNK_INSERT_BATCH) {
       const { error: insertError } = await serviceClient
         .from('document_chunks')
@@ -177,6 +206,16 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         throw new Error(`Failed to store document chunks: ${insertError.message}`);
       }
+    }
+
+    const savedSoFar = alreadySaved + chunkRows.length;
+    if (savedSoFar < chunks.length) {
+      if (usedOcr) {
+        throw new Error(
+          'This scanned document is too large to finish in one pass right now. Please split it into smaller parts.'
+        );
+      }
+      return NextResponse.json({ continue: true, processed: savedSoFar, total: chunks.length });
     }
 
     // ── Step 6: Mark analysis as completed ─────────────────────────────
@@ -253,5 +292,15 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Steps run from the browser, so closing the tab leaves a "processing" row
+  // nothing is working on. Offer Try Again rather than a spinner forever.
+  const startedAt = data?.requested_at ? new Date(data.requested_at).getTime() : 0;
+  if (data?.status === 'processing' && Date.now() - startedAt >= STALE_ANALYSIS_MS) {
+    return NextResponse.json({
+      data: { ...data, status: 'failed', error_message: 'Analysis was interrupted. Try Again to continue from where it stopped.' },
+    });
+  }
+
   return NextResponse.json({ data: data || { status: 'not_started' } });
 }

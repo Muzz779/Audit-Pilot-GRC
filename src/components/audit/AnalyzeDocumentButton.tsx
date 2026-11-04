@@ -20,6 +20,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [progress, setProgress] = useState<number | null>(null);
 
   // Check existing analysis status on mount
   useEffect(() => {
@@ -46,18 +47,29 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
     setAnalyzing(true);
     setStatus('processing');
     setErrorMessage(null);
+    setProgress(null);
     try {
-      const res = await fetch('/api/evidence/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evidence_id: evidenceId, reanalyze }),
-      });
-      // A platform timeout returns an HTML page, not JSON
-      const data = await res.json().catch(() => ({
-        error: 'Analysis timed out. Please try again, or split the file into smaller parts.',
-      }));
+      // Large files take several steps: the server saves what it finished and
+      // says `continue`, so a dropped step can be resumed with Try Again.
+      let data: any;
+      let resume = false;
+      while (true) {
+        const res = await fetch('/api/evidence/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ evidence_id: evidenceId, reanalyze, resume }),
+        });
+        // A platform timeout returns an HTML page, not JSON
+        data = await res.json().catch(() => ({
+          error: 'Analysis timed out. Try Again to continue from where it stopped.',
+        }));
 
-      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+        if (!res.ok) throw new Error(data.error || 'Analysis failed');
+        if (!data.continue) break;
+
+        setProgress(Math.round((data.processed / data.total) * 100));
+        resume = true;
+      }
 
       setStatus('completed');
       setChunkCount(data.chunk_count);
@@ -122,7 +134,7 @@ export function AnalyzeDocumentButton({ evidenceId, hasFile, onAnalysisComplete 
     return (
       <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400">
         <Loader2 className="w-3 h-3 animate-spin" />
-        Analyzing... this can take a minute
+        {progress === null ? 'Analyzing... this can take a minute' : `Analyzing... ${progress}% done. Keep this page open.`}
       </div>
     );
   }
