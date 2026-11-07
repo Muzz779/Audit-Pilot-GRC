@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Source_Serif_4 } from 'next/font/google';
 import { ThemeProvider } from '@/components/shared/ThemeProvider';
 import { Toaster } from 'sonner';
+import { getAppUrl } from '@/lib/app-url';
 import './globals.css';
 
 const inter = Inter({
@@ -18,21 +19,25 @@ const sourceSerif = Source_Serif_4({
   display: 'swap',
 });
 
+// Descriptions match what the product does: AI audits cover POPIA only.
+const DESCRIPTION =
+  'AuditPilot is an AI auditor for POPIA. Upload your policies and evidence and get draft findings cited to the document and page, for your team to review. Track risks, policies and other frameworks alongside.';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(getAppUrl()),
   title: {
     default: 'AuditPilot — AI-Powered GRC Platform',
     template: '%s | AuditPilot',
   },
-  description:
-    'AuditPilot is an AI-powered Governance, Risk & Compliance platform. Manage POPIA, ISO 27001, SOC 2, King IV and more — all in one place.',
-  keywords: ['GRC', 'POPIA', 'compliance', 'risk management', 'ISO 27001', 'South Africa', 'audit', 'governance'],
+  description: DESCRIPTION,
+  keywords: ['GRC', 'POPIA', 'compliance', 'risk management', 'South Africa', 'audit', 'governance'],
   authors: [{ name: 'AuditPilot' }],
   openGraph: {
     type: 'website',
     locale: 'en_ZA',
-    url: 'https://auditpilot.co.za',
+    url: '/',
     title: 'AuditPilot — AI-Powered GRC Platform',
-    description: 'Manage compliance, risks and audits with AI automation. POPIA, ISO 27001, SOC 2 and more.',
+    description: DESCRIPTION,
     siteName: 'AuditPilot',
   },
   robots: { index: true, follow: true },

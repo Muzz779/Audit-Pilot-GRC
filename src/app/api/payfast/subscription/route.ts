@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { buildPayFastPaymentData, PAYFAST_URL } from '@/lib/payfast';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { PAYFAST_URL } from '@/lib/payfast';
+import { buildPayFastPaymentData, cancelPayFastSubscription } from '@/lib/payfast/server';
+import { getAppUrl } from '@/lib/app-url';
 
 // POST — create new subscription / redirect to PayFast
 export async function POST(req: NextRequest) {
@@ -17,14 +19,16 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('organisation_id, full_name, email')
+    .select('organisation_id, full_name, email, role')
     .eq('id', user.id)
     .single();
 
   if (!profile?.organisation_id) return NextResponse.json({ error: 'No organisation' }, { status: 400 });
+  if (!['owner', 'admin'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Only owners and admins can change the plan' }, { status: 403 });
+  }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const nameParts = (profile.full_name || 'User').split(' ');
+  const nameParts = (profile.full_name || 'User').trim().split(/\s+/);
 
   try {
     const paymentData = buildPayFastPaymentData({
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
       userEmail: profile.email || user.email || '',
       firstName: nameParts[0] || 'User',
       lastName: nameParts.slice(1).join(' ') || '.',
-      appUrl,
+      appUrl: getAppUrl(req),
     });
 
     return NextResponse.json({ payfast_url: PAYFAST_URL, payment_data: paymentData });
@@ -61,10 +65,34 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Only owners and admins can cancel subscriptions' }, { status: 403 });
   }
 
-  const { error } = await supabase
+  // Members can't write subscriptions, so the update runs on the server after
+  // the checks above. It used to run as the member, changed nothing, and still
+  // reported success.
+  const serviceClient = await createServiceRoleClient();
+  const { data: sub } = await serviceClient
+    .from('subscriptions')
+    .select('id, payfast_subscription_token')
+    .eq('organisation_id', profile.organisation_id)
+    .single();
+
+  if (!sub) return NextResponse.json({ error: 'No subscription to cancel' }, { status: 404 });
+
+  // Stop the recurring charge at PayFast first. If that fails, nothing changes
+  // here, so the customer is never told they're cancelled while still paying.
+  if (sub.payfast_subscription_token) {
+    const cancelled = await cancelPayFastSubscription(sub.payfast_subscription_token);
+    if (!cancelled.ok) {
+      console.error('PayFast cancel failed:', cancelled.error);
+      return NextResponse.json({
+        error: 'We could not cancel the payment at PayFast, so your plan is unchanged. Please try again, or contact us and we will cancel it for you.',
+      }, { status: 502 });
+    }
+  }
+
+  const { error } = await serviceClient
     .from('subscriptions')
     .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-    .eq('organisation_id', profile.organisation_id);
+    .eq('id', sub.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/index';
 import { cn, formatZAR, formatDate, getStatusColor } from '@/lib/utils';
-import { PRICING_PLANS, PAYFAST_URL } from '@/lib/payfast';
+import { PRICING_PLANS, PAYFAST_SANDBOX } from '@/lib/payfast';
 import { toast } from 'sonner';
 import type { Subscription } from '@/types';
 
@@ -43,7 +43,7 @@ export function BillingContent({
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status');
     if (s === 'success' || s === 'cancelled') setStatusBanner(s);
-    setIsSandbox(process.env.NEXT_PUBLIC_PAYFAST_SANDBOX === 'true');
+    setIsSandbox(PAYFAST_SANDBOX);
   }, []);
 
   const currentTier = subscription?.tier || 'starter';
@@ -244,9 +244,6 @@ export function BillingContent({
                   <h3 className="font-bold text-base text-foreground">{plan.name}</h3>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-2xl font-bold text-foreground">{plan.price_display}</span>
-                    {plan.price_cents > 0 && (
-                      <span className="text-xs text-muted-foreground">excl. VAT</span>
-                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{plan.description}</p>
                 </div>
@@ -282,7 +279,7 @@ export function BillingContent({
         </div>
 
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          All prices in South African Rand (ZAR) · Billed monthly via PayFast · Cancel anytime · VAT excluded
+          All prices in South African Rand (ZAR) · Billed monthly via PayFast · Cancel anytime
         </p>
       </div>
 

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Shield, ArrowLeft, Lock, Database, Bot, FileWarning, Trash2, BadgeCheck, Mail } from 'lucide-react';
 
 export const metadata = {
-  title: 'Security & Trust — AuditPilot',
+  title: 'Security & Trust',
   description: 'How AuditPilot stores, isolates and protects your compliance data — and what we are honest about.',
 };
 

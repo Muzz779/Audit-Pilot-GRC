@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { getAppUrl } from '@/lib/app-url';
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
         full_name: full_name?.trim() || '',
         invited_by: user.id,
       },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/register?invited=true`,
+      redirectTo: `${getAppUrl(req)}/register?invited=true`,
     }
   );
 

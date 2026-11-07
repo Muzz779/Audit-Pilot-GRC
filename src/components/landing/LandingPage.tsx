@@ -350,7 +350,7 @@ export function LandingPage() {
             </div>
           ))}
         </div>
-        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-7">Starter is free forever. Pro is R799/mo excl. VAT (≈ R919 incl.), billed in ZAR via PayFast — cancel anytime, no lock-in. Need more seats, SSO or a dedicated instance? Talk to us about Enterprise.</p>
+        <p className="text-center text-xs text-ink-400 dark:text-ink-500 mt-7">Starter is free forever. Pro is R799 a month, billed in ZAR via PayFast — cancel anytime, no lock-in. Need more seats or something built for you? Talk to us about Enterprise.</p>
       </section>
 
       {/* ── FAQ ─────────────────────────────────────────────────────── */}
@@ -410,9 +410,8 @@ export function LandingPage() {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-5 text-xs text-ink-500 dark:text-ink-400">
             <a href="/security" className="hover:text-ink-900 dark:hover:text-white">Security</a>
-            <a href="/popia" className="hover:text-ink-900 dark:hover:text-white">Privacy Policy</a>
+            <a href="/popia" className="hover:text-ink-900 dark:hover:text-white">Privacy &amp; POPIA Notice</a>
             <a href="/terms" className="hover:text-ink-900 dark:hover:text-white">Terms of Service</a>
-            <a href="/popia" className="hover:text-ink-900 dark:hover:text-white">POPIA Notice</a>
             <a href="mailto:support@auditpilot.co.za" className="hover:text-ink-900 dark:hover:text-white">support@auditpilot.co.za</a>
           </div>
           <p className="text-xs text-ink-400 dark:text-ink-500">© 2026 AuditPilot · Built in South&nbsp;Africa</p>

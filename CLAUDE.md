@@ -39,6 +39,9 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - **The live database can differ from `schema.sql`.** `organisations` was readable by everyone on live although the file says otherwise. Test rules with a real session; don't trust the file.
 - **Row rules can't limit columns.** Protect access fields on `profiles` with the trigger in migration 004, and never let the browser say which organisation an account belongs to. Invitations join on the server (`/api/team/invite`).
 - **Free-tier Voyage is 3 calls a minute and 10K tokens a minute.** Everything above works at that speed, but slowly.
+- **PayFast payment notifications must pass four checks** (`src/lib/payfast/server.ts`): signature, source IP is PayFast's, amount matches the plan, and PayFast's own validate endpoint says `VALID`. Before this, anyone could post a fake "payment complete" and upgrade any organisation. Only `pro` can be bought through the webhook.
+- **PayFast is sandbox unless `NEXT_PUBLIC_PAYFAST_SANDBOX=false`.** Live mode needs `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY` and `PAYFAST_PASSPHRASE` (the passphrase must match the one set in the PayFast dashboard). Cancelling calls PayFast's subscription cancel API, so the plan only drops once PayFast confirms; without a passphrase, cancel fails with a clear error.
+- **Build links with `getAppUrl()`** (`src/lib/app-url.ts`), never `NEXT_PUBLIC_APP_URL` directly. Vercel had it set to localhost, which put localhost in robots.txt, invite emails and PayFast return links. `getAppUrl` ignores a localhost value when running on Vercel.
 - **No new vendors / no scope creep** without flagging it to the human first.
 
 ## What is BUILT and VALIDATED (working, tested on real docs)

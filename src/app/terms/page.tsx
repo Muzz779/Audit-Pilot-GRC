@@ -1,4 +1,4 @@
-export const metadata = { title: 'Terms of Service — AuditPilot' };
+export const metadata = { title: 'Terms of Service' };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DRAFT Terms of Service. This is a starting template, NOT legal advice and NOT a
@@ -65,10 +65,10 @@ export default function TermsPage() {
       </Section>
 
       <Section n="5" title="Data protection and privacy">
-        Your use of the Service is also governed by our Privacy Policy [link]. You remain the
+        Your use of the Service is also governed by our <a href="/popia" className="underline">Privacy &amp; POPIA Notice</a>. You remain the
         responsible party (data controller) for personal information you upload. We process it on your
         behalf to provide the Service, in accordance with the Protection of Personal Information Act,
-        2013 (POPIA) and our Privacy Policy. [A separate data-processing agreement may be required.]
+        2013 (POPIA) and our Privacy &amp; POPIA Notice. [A separate data-processing agreement may be required.]
       </Section>
 
       <Section n="6" title="Fees and billing">
