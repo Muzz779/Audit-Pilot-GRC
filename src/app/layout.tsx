@@ -19,9 +19,10 @@ const sourceSerif = Source_Serif_4({
   display: 'swap',
 });
 
-// Descriptions match what the product does: AI audits cover POPIA only.
+// Descriptions match what the product does: AI audits cite the law for POPIA,
+// GDPR, NIS2 and NIST CSF; the other frameworks are tracked.
 const DESCRIPTION =
-  'AuditPilot is an AI auditor for POPIA. Upload your policies and evidence and get draft findings cited to the document and page, for your team to review. Track risks, policies and other frameworks alongside.';
+  'AuditPilot is an AI auditor for POPIA, GDPR, NIS2 and NIST CSF. Upload your policies and evidence and get draft findings cited to the document and page, for your team to review. Track risks, policies and other frameworks alongside.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(getAppUrl()),

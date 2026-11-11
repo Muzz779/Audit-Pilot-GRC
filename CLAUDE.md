@@ -57,10 +57,11 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 1. `supabase/schema.sql` — core app
 2. `supabase/migration_001_rag.sql` — pgvector, document_chunks, regulation_chunks, rag_queries, match functions
 3. `supabase/seed_popia_regulations.sql` — 8 POPIA sections (unverified)
+   - `supabase/seed_gdpr_nis2_nist_regulations.sql` — 13 GDPR, 13 NIS2 and 22 NIST CSF 2.0 sections (unverified); also prefixes POPIA citations with "POPIA". Safe to re-run. Loaded on live 2026-11-11.
 4. `supabase/migration_002_findings.sql` — control_regulation_map, findings, finding_history
 5. `supabase/migration_003_audit_runs.sql` — audit_runs (batch tracking)
 6. `supabase/migration_004_tenant_isolation.sql` — evidence file isolation, organisations visibility, profile access-field trigger
-Then run `npm run embed-regulations` once to populate regulation embeddings.
+Then run `npm run embed-regulations` to embed any regulation rows without an embedding (batched for the free Voyage tier; safe to re-run).
 
 > NOTE: migrations 002 and 003 have been applied directly in the live Supabase project, but the `.sql` files are NOT yet committed to this repo — so a fresh environment cannot be rebuilt from source alone. Reconstructing and committing them from the live schema is outstanding tech-debt (findings table columns are currently inferable only from code: `findings` has `control_id`→controls.id, `framework_id`, `determination`, `status`, `reviewed_by/at`, `review_note`).
 
@@ -75,9 +76,9 @@ Then run `npm run embed-regulations` once to populate regulation embeddings.
 ## Roadmap — what's LEFT (Phases 4–6 are DONE; remaining below)
 - **Migration 004 is live** (run and verified 2026-11-04 with a normal signed-in account). `supabase/migration_004_rollback.sql` restores the previous rules if it ever has to be undone, which reopens the holes.
 - **Open rule to tighten:** the live `organisations` table has two INSERT rules with `with_check true`, and "Users can create organisations" includes `anon`. Nobody can read or join through them, but anyone can add empty rows. Migration 004 doesn't touch them. Check signup still works before removing `anon`.
-- **⚠️ Framework/regulation coverage gap (LIABILITY — highest open risk):** `compliance_frameworks` seeds 8 frameworks (POPIA, GDPR, ISO 27001, SOC 2, NIS2, PCI-DSS, King IV, NIST CSF), but ONLY POPIA has a regulation knowledge base (`seed_popia_regulations.sql` / `regulation_chunks`). There is currently NO gate stopping a user from running the AI findings engine / Run Full Audit on a non-POPIA framework — the engine finds zero governing regulation, so findings are grounded only in evidence + Claude's general knowledge, NOT cited to any regulation, and because `regulationChunks` is empty `used_unverified_regulation` is `false` so no warning even shows. FIX before launch: gate the findings/audit engine (UI + server) to frameworks that actually have a regulation base (POPIA). See engine `src/lib/findings/engine.ts` (`match_regulation_chunks` by `framework_id`).
+- **⚠️ Framework/regulation coverage gap (LIABILITY):** 4 of the 8 frameworks have a regulation base: POPIA, GDPR, NIS2 and NIST CSF (all `is_verified: false`). Tested 2026-11-11: all 34 GDPR/NIS2/NIST controls retrieve their governing section at the 0.25 threshold. ISO 27001, SOC 2, PCI-DSS and King IV have NONE, because their text is owned by ISO, AICPA, PCI SSC and IoDSA and needs a licence. The engine still runs on them; findings with no regulation citation show a red "AI general-knowledge only, illustrative" warning in the Findings UI and board report. Open decision: gate those four (UI + server) instead of only warning.
 - **Legal review of POPIA seed data** before any live customer — non-negotiable (stays `is_verified: false`, keep unverified warnings).
-- **More frameworks** (GDPR, ISO 27001, etc.) — GATED on building a regulation base for each AND legal review of it; adding unverified frameworks multiplies liability. Do not do this without the human confirming legal review.
+- **More frameworks** — ISO 27001, SOC 2, PCI-DSS and King IV need a licence for their text before a regulation base can be built. GDPR, NIS2 and NIST CSF were added on the human's instruction (2026-11-11), unverified, like POPIA; legal review of all four bases is still required before live customers rely on them.
 - **Commit migrations 002/003** (see NOTE above) so a fresh env is reproducible.
 - **Mobile/responsive pass** + set `STARTER_AI_MONTHLY_CAP` to the real number.
 - **Go-live**: domain (auditpilot.co.za), PayFast sandbox → live, Terms/liability disclaimer, prod env vars.

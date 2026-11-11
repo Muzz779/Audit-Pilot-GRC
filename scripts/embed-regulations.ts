@@ -2,7 +2,9 @@
 // AuditPilot — Embed Regulation Chunks
 // ============================================================
 //
-// Run this ONCE after running seed_popia_regulations.sql.
+// Run after loading regulation text (seed_popia_regulations.sql,
+// seed_gdpr_nis2_nist_regulations.sql). Safe to re-run: it only embeds
+// rows that have no embedding yet.
 // It finds all regulation_chunks rows with a NULL embedding,
 // generates embeddings via Voyage AI, and updates them.
 //
@@ -76,25 +78,44 @@ async function main() {
 
   console.log(`Found ${chunks.length} chunks to embed.`);
 
-  const texts = chunks.map(c => c.chunk_text);
-  const embeddings = await embedTexts(texts);
-
-  console.log('Embeddings generated. Updating database...');
-
-  for (let i = 0; i < chunks.length; i++) {
-    const { error: updateError } = await supabase
-      .from('regulation_chunks')
-      .update({ embedding: embeddings[i] })
-      .eq('id', chunks[i].id);
-
-    if (updateError) {
-      console.error(`Failed to update chunk ${chunks[i].section_reference}:`, updateError.message);
-    } else {
-      console.log(`  ✓ Embedded: ${chunks[i].section_reference}`);
+  // Free-tier Voyage allows 3 requests and 10K tokens a minute, so send small
+  // batches and wait between them. A rate-limited batch is retried.
+  const BATCH = 10;
+  const PAUSE_MS = 21_000;
+  let done = 0;
+  for (let start = 0; start < chunks.length; start += BATCH) {
+    const batch = chunks.slice(start, start + BATCH);
+    let embeddings: number[][] | null = null;
+    for (let attempt = 1; !embeddings; attempt++) {
+      try {
+        embeddings = await embedTexts(batch.map((c: any) => c.chunk_text));
+      } catch (err: any) {
+        if (attempt < 5 && String(err?.message).includes('429')) {
+          console.log('  Rate limited, waiting before retrying...');
+          await new Promise((r) => setTimeout(r, PAUSE_MS));
+        } else {
+          throw err;
+        }
+      }
     }
+
+    for (let i = 0; i < batch.length; i++) {
+      const { error: updateError } = await supabase
+        .from('regulation_chunks')
+        .update({ embedding: embeddings[i] })
+        .eq('id', batch[i].id);
+
+      if (updateError) {
+        console.error(`Failed to update chunk ${batch[i].section_reference}:`, updateError.message);
+      } else {
+        done++;
+        console.log(`  ✓ Embedded: ${batch[i].section_reference}`);
+      }
+    }
+    if (start + BATCH < chunks.length) await new Promise((r) => setTimeout(r, PAUSE_MS));
   }
 
-  console.log(`\nDone. ${chunks.length} regulation chunks embedded and ready for search.`);
+  console.log(`\nDone. ${done} of ${chunks.length} regulation chunks embedded and ready for search.`);
 }
 
 main().catch(err => {

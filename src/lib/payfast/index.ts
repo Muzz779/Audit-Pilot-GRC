@@ -24,7 +24,7 @@ export const PRICING_PLANS = {
     description: 'Perfect for small teams getting started with GRC',
     features: [
       'Up to 5 users',
-      '2 frameworks tracked (AI audit: POPIA)',
+      '2 frameworks tracked (AI audit: POPIA, GDPR, NIS2, NIST CSF)',
       'Basic risk register',
       'Policy library (5 policies)',
       'Email support',
@@ -42,7 +42,7 @@ export const PRICING_PLANS = {
     description: 'For growing businesses serious about compliance',
     features: [
       'Up to 25 users',
-      'All 8 frameworks tracked (AI audit: POPIA)',
+      'All 8 frameworks tracked (AI audit: POPIA, GDPR, NIS2, NIST CSF)',
       'Risk heat map',
       'Unlimited policies',
       'Evidence repository',

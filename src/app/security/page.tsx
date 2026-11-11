@@ -69,7 +69,7 @@ export default function SecurityPage() {
         </Item>
 
         <Item icon={FileWarning} title="The regulation base is unverified — on purpose">
-          AuditPilot&rsquo;s POPIA knowledge base was drafted from the public text of the Act and is clearly
+          AuditPilot&rsquo;s regulation knowledge base (POPIA, GDPR, NIS2 and NIST CSF) was drafted from the official public texts and is clearly
           marked <strong>unverified until a qualified legal practitioner reviews it</strong>. You&rsquo;ll see
           that notice wherever the regulation is used. Every finding is a <strong>draft</strong> that a person
           on your team must review and accept — nothing is auto-finalised, and AuditPilot is decision-support,

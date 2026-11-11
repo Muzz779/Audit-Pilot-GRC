@@ -50,9 +50,9 @@ export function LandingPage() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const FAQS = [
-    { q: 'Which frameworks can AuditPilot actually audit with AI?', a: 'POPIA is the framework with a full regulation base today — findings are cited to your own documents and to the relevant POPIA sections, and flagged as drafts for your review. You can also track ISO 27001, SOC 2, GDPR, King IV, NIS2, PCI-DSS and NIST CSF in the platform, with AI-backed auditing for each rolling out as its regulation base is prepared and legally reviewed.' },
+    { q: 'Which frameworks can AuditPilot actually audit with AI?', a: 'POPIA, GDPR, NIS2 and NIST CSF. For these four, findings are cited to your own documents and to the relevant section of the law or framework, and flagged as drafts for your review. You can also track ISO 27001, SOC 2, King IV and PCI-DSS in the platform. Their official text is owned by the bodies that publish them, so AI auditing against them follows once that text is licensed; until then, AI findings on them are clearly labelled illustrative.' },
     { q: 'How does AuditPilot avoid “hallucinated” compliance answers?', a: 'It only answers from evidence it can retrieve from your documents and the regulation base, and it cites the source every time. When the evidence does not cover a requirement, it says so rather than guessing — and every finding is a draft a human must accept.' },
-    { q: 'Is the POPIA content legally verified?', a: 'The POPIA knowledge base was drafted from the public text of the Act and is clearly marked as unverified until a qualified practitioner reviews it. AuditPilot shows that notice wherever the regulation is used — we would rather be transparent than overstate.' },
+    { q: 'Is the regulation content legally verified?', a: 'Not yet. The knowledge base for each framework was drafted from its official public text and is clearly marked as unverified until a qualified practitioner reviews it. AuditPilot shows that notice wherever the regulation is used — we would rather be transparent than overstate.' },
     { q: 'How does PayFast billing work?', a: 'Billing is in ZAR via PayFast — no forex and no overseas cards. Start on the free plan, upgrade when it is proving its worth, and cancel anytime with no lock-in.' },
     { q: 'Where does my compliance data live?', a: 'Each organisation’s data is encrypted and isolated using row-level security, evidence files are served through short-lived signed links rather than public URLs, and access is controlled per role. Your uploaded documents are used only to generate your findings, AuditPilot does not train AI models on them, and they’re never shared with other organisations. AI processing runs on Anthropic (Claude) and Voyage AI — our Security page explains how each provider handles your text.' },
     { q: 'Can I import my existing policies and registers?', a: 'Yes — upload PDFs (including scanned ones), Word documents, Excel workbooks or CSV files, or start from the built-in policy templates and customise them. Your uploaded documents are what the AI audits against.' },
@@ -128,8 +128,8 @@ export function LandingPage() {
               <span className="text-brand-500">prove</span>, not just claim.
             </h1>
             <p className="text-lg text-ink-500 dark:text-ink-300 leading-relaxed max-w-xl mb-8">
-              AuditPilot is an AI auditor for POPIA. Upload your policies and it reads every page,
-              checks them against the Act, and returns findings cited to the exact document and page —
+              AuditPilot is an AI auditor for POPIA, GDPR, NIS2 and NIST CSF. Upload your policies and it reads every page,
+              checks them against the law, and returns findings cited to the exact document and page —
               as drafts your team reviews and accepts. No guessing. No black box.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -281,10 +281,10 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-5 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <h2 className="font-display-serif text-2xl sm:text-3xl font-semibold tracking-tight text-ink-900 dark:text-white mb-3">
-              Track eight frameworks. AI-audit POPIA today.
+              Track eight frameworks. AI-audit four of them today.
             </h2>
             <p className="text-sm text-ink-500 dark:text-ink-300">
-              POPIA is the only framework with a regulation base today, and that base is still awaiting legal review. AI findings on any other framework are clearly labelled illustrative, not a compliance assessment.
+              POPIA, GDPR, NIS2 and NIST CSF have a regulation base today, each still awaiting legal review. ISO 27001, SOC 2, King IV and PCI-DSS follow once their text is licensed; until then, AI findings on them are clearly labelled illustrative, not a compliance assessment.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

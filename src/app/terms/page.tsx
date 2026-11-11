@@ -48,9 +48,9 @@ export default function TermsPage() {
       </Section>
 
       <Section n="3" title="Regulation data is unverified">
-        The regulatory knowledge base used by the Service (including POPIA content) is
+        The regulatory knowledge base used by the Service (covering POPIA, GDPR, NIS2 and NIST CSF) is
         <strong> AI-drafted and has not been verified by a qualified legal practitioner</strong>.
-        Frameworks other than POPIA currently have <strong>no regulation knowledge base</strong>, and
+        ISO 27001, SOC 2, King IV and PCI-DSS currently have <strong>no regulation knowledge base</strong>, and
         findings generated for them are AI general-knowledge only and are labelled as illustrative. You
         must independently verify all findings against the official text of any applicable law or
         standard and obtain professional advice before acting.

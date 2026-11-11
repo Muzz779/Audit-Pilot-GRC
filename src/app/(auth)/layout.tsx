@@ -17,8 +17,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Compliance you can <span className="font-semibold">prove</span>, not just claim.
           </blockquote>
           <p className="text-sm leading-relaxed text-brand-100 max-w-sm">
-            An evidence-based AI auditor for POPIA. Upload the policies you already have and get
-            traceable, cited findings against the Act — reviewed and accepted by your team.
+            An evidence-based AI auditor for POPIA, GDPR, NIS2 and NIST CSF. Upload the policies you already have and get
+            traceable, cited findings against the law — reviewed and accepted by your team.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4 mt-8">
