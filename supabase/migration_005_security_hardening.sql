@@ -17,6 +17,9 @@
 --   5. Subscriptions: only the server (service role) and platform admins write.
 --   6. Logo and avatar uploads: only into your own folder, images only.
 --   7. Helper functions that run with raised rights get a fixed search_path.
+--   8. The evidence bucket is private. On live it was set to public, so anyone
+--      with a file's link could download it without signing in (checked
+--      12 Nov 2026). The app only uses signed links, so nothing breaks.
 --
 -- Not changed here, on purpose: the "anyone can create an organisation" rule
 -- (includes anon). Signup may rely on it; test signup before removing anon.
@@ -36,7 +39,7 @@ begin
     execute format(
       'create policy "Org members can view %s" on public.%I for select to authenticated using (organisation_id = get_user_org_id() or is_platform_admin())',
       t, t);
-    execute format('revoke insert, update, delete on public.%I from anon, authenticated', t);
+    execute format('revoke insert, update, delete, truncate, references, trigger on public.%I from anon, authenticated', t);
   end loop;
 end $$;
 
@@ -112,6 +115,9 @@ alter function is_platform_admin() set search_path = public;
 alter function get_user_role() set search_path = public;
 alter function handle_new_user() set search_path = public;
 
+-- ── 8: evidence files are private (signed links only) ───────────────
+update storage.buckets set public = false where id = 'evidence';
+
 -- ── Check (run after; each should return what's described) ──────────
 -- Policies on the three audit tables: one SELECT policy each.
 --   select tablename, policyname, cmd from pg_policies
@@ -119,3 +125,5 @@ alter function handle_new_user() set search_path = public;
 -- Every organisation has a plan row (should return 0):
 --   select count(*) from organisations o
 --   where not exists (select 1 from subscriptions s where s.organisation_id = o.id);
+-- Evidence bucket is private (should return false):
+--   select public from storage.buckets where id = 'evidence';
