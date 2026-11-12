@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sparkles, CheckCircle2, XCircle, AlertTriangle, AlertOctagon,
@@ -54,6 +54,10 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
 
   const canReview = ['owner', 'admin', 'member'].includes(userRole);
 
+  // After Run Full Audit the page refreshes from the server. useState only reads
+  // its starting value once, so copy the fresh findings in or new ones never appear.
+  useEffect(() => { setFindings(initialFindings); }, [initialFindings]);
+
   // Controls for the selected framework
   const frameworkControls = controls.filter(c => c.framework_id === selectedFramework);
 
@@ -66,8 +70,12 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
     }
   }
 
-  // Findings list filtered by status
-  const visibleFindings = findings.filter(f => {
+  // Findings list: the current (latest) finding for each control. Re-analysing a
+  // control adds a new finding and keeps the older one in history; showing both made
+  // the list and the counts look as if nothing had changed.
+  const currentFindings = Array.from(latestFindingByControl.values())
+    .sort((a: any, b: any) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime());
+  const visibleFindings = currentFindings.filter(f => {
     if (statusFilter === 'all') return true;
     return f.status === statusFilter;
   }).filter(f => !selectedFramework || f.framework_id === selectedFramework);
@@ -112,7 +120,19 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
       setFindings(prev => prev.map(f =>
         f.id === findingId ? { ...f, status: action === 'accept' ? 'accepted' : 'dismissed' } : f
       ));
-      toast.success(action === 'accept' ? 'Finding accepted' : 'Finding dismissed');
+      if (action === 'accept') {
+        const ref = findings.find(f => f.id === findingId)?.control?.control_id || 'The control';
+        const label: Record<string, string> = {
+          implemented: 'Implemented', in_progress: 'In progress', not_started: 'Not started (a gap)',
+        };
+        const applied = data.control_status_applied as string | null;
+        toast.success(applied
+          ? `Finding accepted. ${ref} is now ${label[applied] || applied} on the Compliance page, and the score is updated.`
+          : 'Finding accepted.');
+        router.refresh();
+      } else {
+        toast.success('Finding dismissed. It does not change the control or the score.');
+      }
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -120,12 +140,14 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
     }
   };
 
-  const draftCount = findings.filter(f => f.status === 'draft_pending_review').length;
+  const inFramework = (f: any) => !selectedFramework || f.framework_id === selectedFramework;
+  const draftCount = currentFindings.filter(f => f.status === 'draft_pending_review' && inFramework(f)).length;
 
-  // Accepted findings for the selected framework — drives the Board Report button
-  const acceptedCount = findings.filter(
-    f => f.status === 'accepted' && (!selectedFramework || f.framework_id === selectedFramework)
-  ).length;
+  // Controls with an accepted finding in the selected framework, which is what the
+  // Board Report lists (its most recently accepted finding per control)
+  const acceptedCount = new Set(
+    findings.filter(f => f.status === 'accepted' && inFramework(f)).map(f => f.control_id)
+  ).size;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

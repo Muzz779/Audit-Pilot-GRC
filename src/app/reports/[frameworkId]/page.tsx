@@ -108,7 +108,18 @@ export default async function BoardReportPage({ params }: { params: Promise<{ fr
   const implementedCount = applicable.filter((c: any) => c.status === 'implemented').length;
   const score = orgFramework.compliance_score ?? 0;
 
-  const findings = acceptedFindings || [];
+  // A control re-analysed and accepted again keeps its older accepted finding in
+  // history. Report only the most recently accepted one per control, which is
+  // also the one that set the control's status and the score.
+  const latestAcceptedByControl = new Map<string, any>();
+  for (const f of (acceptedFindings || []) as any[]) {
+    const key = f.control?.control_id || f.id;
+    const existing = latestAcceptedByControl.get(key);
+    if (!existing || new Date(f.reviewed_at || 0) > new Date(existing.reviewed_at || 0)) {
+      latestAcceptedByControl.set(key, f);
+    }
+  }
+  const findings = Array.from(latestAcceptedByControl.values());
   const satisfied = findings.filter((f: any) => f.determination === 'satisfied').length;
   const partial = findings.filter((f: any) => f.determination === 'partial').length;
   const gap = findings.filter((f: any) => f.determination === 'gap').length;

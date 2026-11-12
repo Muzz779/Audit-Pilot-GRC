@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
 
   const body: any = await req.json();
   const { framework_id } = body;
+  // rerun_all: analyse every control again, e.g. after new evidence was uploaded.
+  // Older findings are kept in history; the new draft becomes the current one.
+  const rerunAll = body.rerun_all === true;
   if (!framework_id) return NextResponse.json({ error: 'framework_id is required' }, { status: 400 });
 
   // Get all controls for this framework
@@ -42,14 +45,14 @@ export async function POST(req: NextRequest) {
 
   const pendingControlIds = controls
     .map((c: any) => c.id)
-    .filter((id: string) => !controlsWithFindings.has(id));
+    .filter((id: string) => rerunAll || !controlsWithFindings.has(id));
 
   const skippedCount = controls.length - pendingControlIds.length;
 
   // If everything is already analyzed, nothing to do
   if (pendingControlIds.length === 0) {
     return NextResponse.json({
-      error: `All ${controls.length} controls already have findings. Re-analyze individual controls if you want to regenerate them.`,
+      error: `All ${controls.length} controls already have findings. Use "Re-run all controls" to analyse them again against your current evidence.`,
       all_analyzed: true,
     }, { status: 400 });
   }

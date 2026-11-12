@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { PlayCircle, Loader2, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
+import { PlayCircle, Loader2, CheckCircle2, XCircle, StopCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -35,7 +35,15 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
   const [state, setState] = useState<RunState | null>(null);
   const cancelRef = useRef(false);
 
-  const startRun = async () => {
+  const startRun = async (rerunAll = false) => {
+    if (rerunAll && !window.confirm(
+      `Analyse all ${frameworkName} controls again against your current evidence?
+
+` +
+      'Each control gets a new draft finding to review. Earlier findings, including accepted ones, ' +
+      'stay in the history, and control statuses only change when you accept a new finding. ' +
+      'This uses one AI operation per control.'
+    )) return;
     setRunning(true);
     cancelRef.current = false;
     setState(null);
@@ -45,7 +53,7 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
       const startRes = await fetch('/api/audit-runs/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ framework_id: frameworkId }),
+        body: JSON.stringify({ framework_id: frameworkId, rerun_all: rerunAll }),
       });
       const startData = await startRes.json();
 
@@ -164,13 +172,18 @@ export function RunFullAudit({ frameworkId, frameworkName, onComplete }: RunFull
           <p className="text-sm font-semibold text-foreground">Run Full Audit</p>
           <p className="text-xs text-muted-foreground">
             Analyze every {frameworkName} control against your evidence in one pass.
-            Controls that already have findings are skipped.
+            Controls that already have findings are skipped. After adding new evidence, use Re-run all controls.
           </p>
         </div>
         {!running ? (
-          <Button onClick={startRun} size="sm" className="shrink-0">
-            <PlayCircle className="w-4 h-4" /> Run Full Audit
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button onClick={() => startRun(true)} size="sm" variant="outline">
+              <RotateCcw className="w-4 h-4" /> Re-run all controls
+            </Button>
+            <Button onClick={() => startRun(false)} size="sm">
+              <PlayCircle className="w-4 h-4" /> Run Full Audit
+            </Button>
+          </div>
         ) : (
           <Button onClick={stopRun} size="sm" variant="outline" className="shrink-0">
             <StopCircle className="w-4 h-4" /> Stop
