@@ -122,13 +122,15 @@ export function FindingsContent({ frameworks, controls, initialFindings, orgId, 
       ));
       if (action === 'accept') {
         const ref = findings.find(f => f.id === findingId)?.control?.control_id || 'The control';
-        const label: Record<string, string> = {
-          implemented: 'Implemented', in_progress: 'In progress', not_started: 'Not started (a gap)',
+        // Only Implemented controls count towards the compliance score, so say plainly
+        // when accepting a Partial or Gap finding leaves the score where it was.
+        const message: Record<string, string> = {
+          implemented: `${ref} is now Implemented on the Compliance page and counts towards the score.`,
+          in_progress: `${ref} is now In progress on the Compliance page. Only Satisfied findings raise the score.`,
+          not_started: `${ref} is Not started (a gap) on the Compliance page. Only Satisfied findings raise the score.`,
         };
         const applied = data.control_status_applied as string | null;
-        toast.success(applied
-          ? `Finding accepted. ${ref} is now ${label[applied] || applied} on the Compliance page, and the score is updated.`
-          : 'Finding accepted.');
+        toast.success(`Finding accepted. ${(applied && message[applied]) || ''}`.trim(), { duration: 8000 });
         router.refresh();
       } else {
         toast.success('Finding dismissed. It does not change the control or the score.');
