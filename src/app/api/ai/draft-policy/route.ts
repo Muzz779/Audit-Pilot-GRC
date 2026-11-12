@@ -27,6 +27,10 @@ export async function POST(req: NextRequest) {
     .single();
 
   const body: any = await req.json();
+  // Keeps one request within the cost of one metered AI operation.
+  if (JSON.stringify(body ?? {}).length > 8000) {
+    return NextResponse.json({ error: 'Please shorten your input (8,000 characters at most)' }, { status: 400 });
+  }
   const { title, description, category, industry, frameworks = [] } = body;
 
   if (!title?.trim()) return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -54,6 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ content });
   } catch (err: any) {
     console.error('AI policy draft error:', err);
-    return NextResponse.json({ error: err.message || 'AI drafting failed' }, { status: 500 });
+    return NextResponse.json({ error: 'The policy draft could not be created. Please try again.' }, { status: 500 });
   }
 }

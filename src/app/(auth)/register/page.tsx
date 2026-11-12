@@ -136,14 +136,8 @@ function RegisterForm() {
 
       if (profileError) throw profileError;
 
-      // Create starter subscription
-      await supabase.from('subscriptions').insert({
-        organisation_id: organisationId,
-        tier: 'starter',
-        status: 'active',
-        amount_cents: 0,
-        billing_cycle: 'monthly',
-      });
+      // The starter plan row is created by the database when the organisation
+      // is inserted (migration 005). Browsers can't write subscriptions.
 
       // Welcome notification
       await supabase.from('notifications').insert({

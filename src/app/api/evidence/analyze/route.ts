@@ -4,6 +4,7 @@ import { extractDocument, type ExtractionResult } from '@/lib/rag/extraction';
 import { chunkDocument } from '@/lib/rag/chunking';
 import { embedWithinBudget } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
+import { resolveEvidencePath } from '@/lib/evidence/storage-path';
 
 export const maxDuration = 120; // covers a scanned PDF read, which is the longest step
 
@@ -108,13 +109,11 @@ export async function POST(req: NextRequest) {
     // rather than fetching the public URL, which won't work for private buckets.
     const serviceClient = await createServiceRoleClient();
 
-    // file_url now stores the storage path directly (orgId/timestamp-filename).
-    // Older rows stored a public URL that embeds the path after "/evidence/" — handle both.
-    const storagePath = evidence.file_url.includes('/evidence/')
-      ? evidence.file_url.split('/evidence/')[1]
-      : evidence.file_url;
+    // file_url stores the storage path (orgId/timestamp-filename). Only a file in
+    // the caller's own organisation folder may be read with the service role.
+    const storagePath = resolveEvidencePath(evidence.file_url, profile.organisation_id);
     if (!storagePath) {
-      throw new Error('Could not resolve storage path from evidence record. Please re-upload the file.');
+      throw new Error('Could not find the file for this document. Please re-upload it.');
     }
 
     const { data: fileData, error: downloadError } = await serviceClient.storage
@@ -122,7 +121,8 @@ export async function POST(req: NextRequest) {
       .download(storagePath);
 
     if (downloadError || !fileData) {
-      throw new Error(`Could not download file from storage: ${downloadError?.message || 'File not found'}. Please re-upload the evidence file.`);
+      console.error('Evidence download failed:', downloadError?.message);
+      throw new Error('Could not open the stored file. Please re-upload the evidence file.');
     }
 
     const fileBuffer = Buffer.from(await fileData.arrayBuffer());
@@ -160,6 +160,11 @@ export async function POST(req: NextRequest) {
 
     const usedOcr = extraction.pages.some(page => page.extractionMethod === 'ocr');
     const readScanNow = usedOcr && !resumedScan;
+
+    // A fresh scanned reading is a paid AI call, so it is metered here, not only
+    // when the whole analysis completes. Otherwise repeated re-analysis could
+    // run OCR again and again without counting towards the monthly limit.
+    if (readScanNow) await logAiUsage(profile.organisation_id, user.id, 'evidence_ocr');
 
     let scanSaved = false;
     if (readScanNow) {

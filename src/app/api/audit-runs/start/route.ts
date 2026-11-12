@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -71,7 +71,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Create the run record with the work queue
-  const { data: run, error: runError } = await supabase
+  // Runs are written with the service role (migration 005 blocks browser writes).
+  const db = await createServiceRoleClient();
+  const { data: run, error: runError } = await db
     .from('audit_runs')
     .insert({
       organisation_id: profile.organisation_id,
@@ -86,7 +88,10 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (runError) return NextResponse.json({ error: runError.message }, { status: 500 });
+  if (runError) {
+    console.error('Audit run start failed:', runError.message);
+    return NextResponse.json({ error: 'The audit could not be started. Please try again.' }, { status: 500 });
+  }
 
   await supabase.from('audit_logs').insert({
     organisation_id: profile.organisation_id,

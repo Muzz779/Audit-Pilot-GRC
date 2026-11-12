@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+// Everything users type (organisation name, risk and policy titles) is escaped
+// before it goes into this HTML. The report opens as a blob: URL on the app's
+// own origin, so unescaped text could run a script as whoever opens it.
+function esc(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
   <div class="header">
     <div class="logo">🛡️ AuditPilot</div>
     <h1>Compliance Status Report</h1>
-    <div class="meta">${org?.name || 'Organisation'} · ${org?.industry || ''} · Generated: ${reportDate}</div>
+    <div class="meta">${esc(org?.name || 'Organisation')} · ${esc(org?.industry || '')} · Generated: ${reportDate}</div>
   </div>
 
   <div class="section">
@@ -107,8 +119,8 @@ export async function POST(req: NextRequest) {
       <tbody>
         ${frameworks?.map(f => `
           <tr>
-            <td>${f.framework?.name || 'Unknown'} (${f.framework?.short_name})</td>
-            <td>${f.compliance_score}%</td>
+            <td>${esc(f.framework?.name || 'Unknown')} (${esc(f.framework?.short_name)})</td>
+            <td>${esc(f.compliance_score)}%</td>
             <td><span class="badge ${f.compliance_score >= 80 ? 'badge-green' : f.compliance_score >= 60 ? 'badge-amber' : 'badge-red'}">${f.compliance_score >= 80 ? 'Compliant' : f.compliance_score >= 60 ? 'In Progress' : 'Needs Attention'}</span></td>
           </tr>
         `).join('') || '<tr><td colspan="3">No frameworks tracked</td></tr>'}
@@ -126,8 +138,8 @@ export async function POST(req: NextRequest) {
       <tbody>
         ${risks?.slice(0, 10).map(r => `
           <tr>
-            <td>${r.title}</td>
-            <td><strong>${r.risk_score}/25</strong></td>
+            <td>${esc(r.title)}</td>
+            <td><strong>${esc(r.risk_score)}/25</strong></td>
             <td><span class="badge ${r.risk_score >= 17 ? 'badge-red' : r.risk_score >= 10 ? 'badge-amber' : 'badge-green'}">${r.risk_score >= 17 ? 'Critical' : r.risk_score >= 10 ? 'High' : r.risk_score >= 5 ? 'Medium' : 'Low'}</span></td>
           </tr>
         `).join('') || '<tr><td colspan="3">No risks registered</td></tr>'}
@@ -142,9 +154,9 @@ export async function POST(req: NextRequest) {
       <tbody>
         ${policies?.map(p => `
           <tr>
-            <td>${p.title}</td>
-            <td>${p.category || '—'}</td>
-            <td><span class="badge ${p.status === 'approved' ? 'badge-green' : p.status === 'review' ? 'badge-blue' : 'badge-gray'}">${p.status}</span></td>
+            <td>${esc(p.title)}</td>
+            <td>${esc(p.category || '—')}</td>
+            <td><span class="badge ${p.status === 'approved' ? 'badge-green' : p.status === 'review' ? 'badge-blue' : 'badge-gray'}">${esc(p.status)}</span></td>
           </tr>
         `).join('') || '<tr><td colspan="3">No policies created</td></tr>'}
       </tbody>

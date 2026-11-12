@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { recalcFrameworkScore } from '@/lib/compliance/score';
 
 // Phase 4: an ACCEPTED finding's determination maps to a control status.
@@ -54,6 +54,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
 
+  // Findings, their history and audit runs are written with the service role,
+  // only after the checks above. Browsers can read these tables but can't write
+  // them (migration 005), so nobody can forge an accepted review.
+  const db = await createServiceRoleClient();
+
   const body: any = await req.json();
   const { finding_id, action, review_note } = body;
 
@@ -74,20 +79,23 @@ export async function PATCH(req: NextRequest) {
 
   const newStatus = action === 'accept' ? 'accepted' : 'dismissed';
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('findings')
     .update({
       status: newStatus,
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),
-      review_note: review_note || null,
+      review_note: typeof review_note === 'string' ? review_note.slice(0, 2000) : null,
     })
     .eq('id', finding_id)
     .eq('organisation_id', profile.organisation_id)
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Finding review failed:', error.message);
+    return NextResponse.json({ error: 'The finding could not be updated. Please try again.' }, { status: 500 });
+  }
 
   // ── Phase 4: closing the loop ────────────────────────────────────────────────
   // Only an ACCEPT drives control state; dismiss never does. The determination maps
@@ -118,13 +126,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Log to history
-  await supabase.from('finding_history').insert({
+  await db.from('finding_history').insert({
     finding_id,
     organisation_id: profile.organisation_id,
     action: action === 'accept' ? 'accepted' : 'dismissed',
     previous_status: current.status,
     new_status: newStatus,
-    note: review_note || null,
+    note: typeof review_note === 'string' ? review_note.slice(0, 2000) : null,
     actor_id: user.id,
   });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { analyzeControl } from '@/lib/findings/engine';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 
@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
   if (!['owner', 'admin', 'member'].includes(profile.role)) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
+
+  // Findings, their history and audit runs are written with the service role,
+  // only after the checks above. Browsers can read these tables but can't write
+  // them (migration 005), so nobody can forge an accepted review.
+  const db = await createServiceRoleClient();
 
   // Cost guard — block if the org has hit its monthly AI operation cap
   const quota = await checkAiQuota(profile.organisation_id);
@@ -58,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ── Save as a DRAFT finding (pending review) ───────────────────
-    const { data: finding, error: findingError } = await supabase
+    const { data: finding, error: findingError } = await db
       .from('findings')
       .insert({
         organisation_id: profile.organisation_id,
@@ -82,11 +87,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (findingError) {
-      throw new Error(`Failed to save finding: ${findingError.message}`);
+      console.error('Saving finding failed:', findingError.message);
+      throw new Error('The finding could not be saved.');
     }
 
     // ── Log to finding history ─────────────────────────────────────
-    await supabase.from('finding_history').insert({
+    await db.from('finding_history').insert({
       finding_id: finding.id,
       organisation_id: profile.organisation_id,
       action: 'generated',
@@ -111,7 +117,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('Finding generation error:', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to analyze control' },
+      { error: 'This control could not be analysed. Please try again.' },
       { status: 500 }
     );
   }

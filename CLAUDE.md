@@ -42,6 +42,8 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 - **PayFast payment notifications must pass four checks** (`src/lib/payfast/server.ts`): signature, source IP is PayFast's, amount matches the plan, and PayFast's own validate endpoint says `VALID`. Before this, anyone could post a fake "payment complete" and upgrade any organisation. Only `pro` can be bought through the webhook.
 - **PayFast is sandbox unless `NEXT_PUBLIC_PAYFAST_SANDBOX=false`.** Live mode needs `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY` and `PAYFAST_PASSPHRASE` (the passphrase must match the one set in the PayFast dashboard). Cancelling calls PayFast's subscription cancel API, so the plan only drops once PayFast confirms; without a passphrase, cancel fails with a clear error.
 - **Build links with `getAppUrl()`** (`src/lib/app-url.ts`), never `NEXT_PUBLIC_APP_URL` directly. Vercel had it set to localhost, which put localhost in robots.txt, invite emails and PayFast return links. `getAppUrl` ignores a localhost value when running on Vercel.
+- **Evidence `file_url` is written by the browser, so never trust it.** Every service-role touch of the `evidence` bucket goes through `resolveEvidencePath` (`src/lib/evidence/storage-path.ts`), which only allows paths in the caller's own organisation folder.
+- **Escape user text in any HTML built as a string** (`/api/audit-report`): it opens as a blob URL on the app's origin, so unescaped text runs as script.
 - **No new vendors / no scope creep** without flagging it to the human first.
 
 ## What is BUILT and VALIDATED (working, tested on real docs)
@@ -61,6 +63,7 @@ AuditPilot is an AI-powered Governance, Risk & Compliance (GRC) SaaS platform fo
 4. `supabase/migration_002_findings.sql` — control_regulation_map, findings, finding_history
 5. `supabase/migration_003_audit_runs.sql` — audit_runs (batch tracking)
 6. `supabase/migration_004_tenant_isolation.sql` — evidence file isolation, organisations visibility, profile access-field trigger
+7. `supabase/migration_005_security_hardening.sql` — findings/finding_history/audit_runs read-only for browsers (server writes them with the service role), audit-log and notification insert rules, starter-plan trigger, own-folder logo/avatar uploads, search_path on definer functions. Run AFTER the matching app code is deployed.
 Then run `npm run embed-regulations` to embed any regulation rows without an embedding (batched for the free Voyage tier; safe to re-run).
 
 > NOTE: migrations 002 and 003 have been applied directly in the live Supabase project, but the `.sql` files are NOT yet committed to this repo — so a fresh environment cannot be rebuilt from source alone. Reconstructing and committing them from the live schema is outstanding tech-debt (findings table columns are currently inferable only from code: `findings` has `control_id`→controls.id, `framework_id`, `determination`, `status`, `reviewed_by/at`, `review_note`).

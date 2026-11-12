@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { resolveEvidencePath } from '@/lib/evidence/storage-path';
 
 // GET — issue a short-lived signed URL for an evidence file and redirect to it.
 // The private `evidence` bucket is never exposed via public URLs (see CLAUDE.md gotcha).
@@ -28,11 +29,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Evidence file not found' }, { status: 404 });
   }
 
-  // file_url now stores the storage PATH directly; older rows stored a public URL
-  // that embeds the path after "/evidence/". Handle both.
-  const storagePath = evidence.file_url.includes('/evidence/')
-    ? evidence.file_url.split('/evidence/')[1]
-    : evidence.file_url;
+  // Only files inside the caller's own organisation folder can be signed.
+  const storagePath = resolveEvidencePath(evidence.file_url, profile.organisation_id);
+  if (!storagePath) {
+    return NextResponse.json({ error: 'Evidence file not found' }, { status: 404 });
+  }
 
   const serviceClient = await createServiceRoleClient();
   const { data: signed, error } = await serviceClient.storage
@@ -40,10 +41,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .createSignedUrl(storagePath, 60); // 60-second TTL — just long enough to open
 
   if (error || !signed?.signedUrl) {
-    return NextResponse.json(
-      { error: `Could not generate download link: ${error?.message || 'unknown error'}` },
-      { status: 500 }
-    );
+    console.error('Signed URL failed:', error?.message);
+    return NextResponse.json({ error: 'Could not generate a download link. Please try again.' }, { status: 500 });
   }
 
   return NextResponse.redirect(signed.signedUrl);

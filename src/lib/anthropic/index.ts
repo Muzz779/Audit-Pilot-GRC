@@ -134,7 +134,7 @@ export async function chatWithGRC(params: {
     console.error('Anthropic API error (full):', JSON.stringify(err, null, 2));
     console.error('Anthropic error status:', err?.status);
     console.error('Anthropic error message:', err?.message);
-    throw new Error(`Claude API error: ${err?.status || ''} ${err?.message || err?.error?.message || 'unknown error'}`);
+    throw new Error('The AI service could not respond. Please try again.');
   }
 }
 

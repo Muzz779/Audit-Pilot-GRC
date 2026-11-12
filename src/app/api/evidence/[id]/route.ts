@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { resolveEvidencePath } from '@/lib/evidence/storage-path';
 
 // Deletes one evidence document: the stored file, then the record. Its search
 // chunks and analysis row go with the record through ON DELETE CASCADE.
@@ -40,18 +41,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   // File first: if this fails the record survives, so the user can retry
   // rather than leaving an orphaned file nothing points to.
-  if (evidence.file_url) {
-    const storagePath = evidence.file_url.includes('/evidence/')
-      ? evidence.file_url.split('/evidence/')[1]
-      : evidence.file_url;
-
+  // A file_url outside the caller's own folder is never removed (it could be
+  // another organisation's file); the record itself is still deleted.
+  const storagePath = resolveEvidencePath(evidence.file_url, profile.organisation_id);
+  if (storagePath) {
     // The second path is a scanned reading left by an unfinished analysis
     const { error: storageError } = await serviceClient.storage
       .from('evidence')
       .remove([storagePath, `${storagePath}.ocr.json`]);
     if (storageError) {
+      console.error('Evidence file delete failed:', storageError.message);
       return NextResponse.json(
-        { error: `The stored file could not be deleted: ${storageError.message}` },
+        { error: 'The stored file could not be deleted. Please try again.' },
         { status: 500 }
       );
     }
@@ -64,7 +65,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     .eq('organisation_id', profile.organisation_id);
 
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    console.error('Evidence delete failed:', deleteError.message);
+    return NextResponse.json({ error: 'The evidence record could not be deleted. Please try again.' }, { status: 500 });
   }
 
   await supabase.from('audit_logs').insert({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { embedQuery } from '@/lib/rag/embeddings';
+import { embedQuery, VoyageRateLimitError } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -55,8 +55,11 @@ export async function POST(req: NextRequest) {
   const body: any = await req.json();
   const { question, framework_id } = body;
 
-  if (!question?.trim()) {
+  if (typeof question !== 'string' || !question.trim()) {
     return NextResponse.json({ error: 'A question is required' }, { status: 400 });
+  }
+  if (question.length > 2000) {
+    return NextResponse.json({ error: 'Please keep your question under 2,000 characters' }, { status: 400 });
   }
 
   try {
@@ -198,8 +201,14 @@ ${regulationContext || '(none retrieved)'}`;
 
   } catch (err: any) {
     console.error('RAG query error:', err);
+    if (err instanceof VoyageRateLimitError) {
+      return NextResponse.json(
+        { error: 'The search service is busy. Please wait a minute and ask again.' },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
-      { error: err.message || 'Failed to process your question' },
+      { error: 'Your question could not be answered just now. Please try again.' },
       { status: 500 }
     );
   }

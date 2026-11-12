@@ -73,6 +73,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err: any) {
     console.error('Regulatory scan error:', err);
-    return NextResponse.json({ error: err.message || 'Scan failed' }, { status: 500 });
+    return NextResponse.json({ error: 'The regulatory scan could not be completed. Please try again.' }, { status: 500 });
   }
 }

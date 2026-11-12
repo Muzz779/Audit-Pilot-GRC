@@ -227,10 +227,15 @@ Assess whether this control is satisfied by the evidence. Respond with only the 
     return `[EV-${i + 1}] ${docName}${loc}`;
   }).join('; ');
 
+  // Only known values are stored. Anything else the model returns is treated
+  // as unassessed / low confidence rather than trusted.
+  const pick = (value: unknown, allowed: string[], fallback: string): string =>
+    typeof value === 'string' && allowed.includes(value.toLowerCase()) ? value.toLowerCase() : fallback;
+
   return {
-    determination: parsed.determination || 'not_assessed',
-    confidence: parsed.confidence || 'low',
-    severity: parsed.severity || inferSeverityFromCategory(control.category),
+    determination: pick(parsed.determination, ['satisfied', 'partial', 'gap', 'not_assessed'], 'not_assessed') as FindingResult['determination'],
+    confidence: pick(parsed.confidence, ['high', 'medium', 'low'], 'low') as FindingResult['confidence'],
+    severity: pick(parsed.severity, ['critical', 'high', 'medium', 'low', 'informational'], inferSeverityFromCategory(control.category)) as FindingResult['severity'],
     title: parsed.title || control.name,
     summary: parsed.summary || '',
     reasoning: parsed.reasoning || '',

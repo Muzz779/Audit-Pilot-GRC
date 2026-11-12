@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
   if (!quota.allowed) return NextResponse.json(quotaExceededResponse(quota), { status: 429 });
 
   const body: any = await req.json();
+  // Keeps one request within the cost of one metered AI operation.
+  if (JSON.stringify(body ?? {}).length > 8000) {
+    return NextResponse.json({ error: 'Please shorten your input (8,000 characters at most)' }, { status: 400 });
+  }
   const { title, description, category } = body;
 
   if (!title?.trim()) return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -46,6 +50,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err: any) {
     console.error('AI risk assessment error:', err);
-    return NextResponse.json({ error: err.message || 'Assessment failed' }, { status: 500 });
+    return NextResponse.json({ error: 'The risk assessment could not be completed. Please try again.' }, { status: 500 });
   }
 }

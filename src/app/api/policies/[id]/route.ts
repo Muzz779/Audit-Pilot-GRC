@@ -33,6 +33,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (category !== undefined)    update.category = category;
 
   if (status === 'approved') {
+    // Separation of duties: only an owner or admin can approve a policy.
+    const { data: approver } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single();
+    if (!['owner', 'admin'].includes(approver?.role || '')) {
+      return NextResponse.json({ error: 'Only owners and admins can approve policies' }, { status: 403 });
+    }
     update.approved_by = user.id;
     update.approved_at = new Date().toISOString();
   }

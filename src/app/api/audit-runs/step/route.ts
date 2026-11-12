@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { analyzeControl } from '@/lib/findings/engine';
 import { VoyageRateLimitError } from '@/lib/rag/embeddings';
 import { checkAiQuota, quotaExceededResponse, logAiUsage } from '@/lib/usage/quota';
@@ -14,6 +14,14 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase
     .from('profiles').select('organisation_id, role').eq('id', user.id).single();
   if (!profile?.organisation_id) return NextResponse.json({ error: 'No organisation' }, { status: 400 });
+  if (!['owner', 'admin', 'member'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+  }
+
+  // Findings, their history and audit runs are written with the service role,
+  // only after the checks above. Browsers can read these tables but can't write
+  // them (migration 005), so nobody can forge an accepted review.
+  const db = await createServiceRoleClient();
 
   const body: any = await req.json();
   const { run_id, cancel } = body;
@@ -31,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   // Explicit cancel request from the frontend
   if (cancel) {
-    const { data: updated } = await supabase
+    const { data: updated } = await db
       .from('audit_runs')
       .update({ status: 'cancelled', completed_at: new Date().toISOString() })
       .eq('id', run_id)
@@ -48,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   // Queue empty → mark complete
   if (pending.length === 0) {
-    const { data: updated } = await supabase
+    const { data: updated } = await db
       .from('audit_runs')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', run_id)
@@ -71,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   // If control vanished, skip it and continue
   if (!control) {
-    const { data: updated } = await supabase
+    const { data: updated } = await db
       .from('audit_runs')
       .update({
         pending_control_ids: remaining,
@@ -107,7 +115,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Save the finding (draft, pending review) — this is the partial-save point
-    const { data: finding, error: findingError } = await supabase
+    const { data: finding, error: findingError } = await db
       .from('findings')
       .insert({
         organisation_id: profile.organisation_id,
@@ -135,7 +143,7 @@ export async function POST(req: NextRequest) {
     // Meter this AI operation against the org's monthly usage
     await logAiUsage(profile.organisation_id, user.id, 'finding_analysis');
 
-    await supabase.from('finding_history').insert({
+    await db.from('finding_history').insert({
       finding_id: finding.id,
       organisation_id: profile.organisation_id,
       action: 'generated',
@@ -149,7 +157,7 @@ export async function POST(req: NextRequest) {
       result.determination === 'partial'   ? { partial_count: run.partial_count + 1 } :
       result.determination === 'gap'       ? { gap_count: run.gap_count + 1 } : {};
 
-    const { data: updated } = await supabase
+    const { data: updated } = await db
       .from('audit_runs')
       .update({
         pending_control_ids: remaining,
@@ -178,7 +186,7 @@ export async function POST(req: NextRequest) {
     // The batch does NOT die because of one control.
     console.error(`Audit run ${run_id}: control ${controlId} failed:`, err.message);
 
-    const { data: updated } = await supabase
+    const { data: updated } = await db
       .from('audit_runs')
       .update({
         pending_control_ids: remaining,
@@ -192,7 +200,7 @@ export async function POST(req: NextRequest) {
       done: false,
       run: updated,
       last_control: control.name,
-      last_error: err.message,
+      last_error: 'This control could not be analysed.',
     });
   }
 }

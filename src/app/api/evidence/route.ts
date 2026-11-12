@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { resolveEvidencePath } from '@/lib/evidence/storage-path';
 
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   const { name, description, control_id, file_url, file_name, file_size, file_type, tags } = body;
 
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+  // The file must be in this organisation's own storage folder.
+  if (file_url && !resolveEvidencePath(file_url, profile.organisation_id)) {
+    return NextResponse.json({ error: 'Invalid file location' }, { status: 400 });
+  }
 
   // Status is 'uploaded' if we have a file_url, otherwise 'pending'
   const status = file_url ? 'uploaded' : 'pending';

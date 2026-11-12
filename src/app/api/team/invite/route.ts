@@ -50,20 +50,29 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     console.error('Invite error:', inviteError);
-    return NextResponse.json({ error: inviteError.message }, { status: 500 });
+    return NextResponse.json({ error: 'The invitation could not be sent. Please check the email address and try again.' }, { status: 500 });
   }
 
   // Joining happens here on the server, because the browser can't be trusted
   // to say which organisation an account belongs to. The signup trigger has
-  // already created the profile row.
-  const { error: linkError } = await adminClient
+  // already created the profile row. Only an account with no organisation yet
+  // can be linked, so an invite can never pull someone out of another company.
+  const { data: linked, error: linkError } = await adminClient
     .from('profiles')
     .update({
       organisation_id: profile.organisation_id,
       role: invitedRole,
       onboarding_completed: true,
     })
-    .eq('id', invited.user.id);
+    .eq('id', invited.user.id)
+    .is('organisation_id', null)
+    .select('id');
+
+  if (!linkError && (!linked || linked.length === 0)) {
+    return NextResponse.json({
+      error: 'This person already belongs to an organisation, so they could not be added to yours.',
+    }, { status: 400 });
+  }
 
   if (linkError) {
     console.error('Invite link error:', linkError);
